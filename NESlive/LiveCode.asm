@@ -30,16 +30,26 @@ BUTTON_RIGHT  = %00000001
 
 joypad1_state      .rs 1
 bullet_active      .rs 1
+temp_x             .rs 1
+temp_y             .rs 1
+
+ENEMY_SQUAD_WIDTH    = 6
+ENEMY_SQUAD_HEIGHT   = 4
+NUM_ENEMIES          = ENEMY_SQUAD_WIDTH * ENEMY_SQUAD_HEIGHT
+ENEMY_SPACING        = 16
 
     .rsset $0200
 sprite_player      .rs 4
 sprite_bullet      .rs 4
+sprite_enemy      .rs 4 * NUM_ENEMIES
 
     .rsset $0000
 SPRITE_Y           .rs 1
 SPRITE_TILE        .rs 1
 SPRITE_ATTRIB      .rs 1
 SPRITE_X           .rs 1
+
+
 
 
     .bank 0
@@ -137,6 +147,21 @@ vblankwait2:
     STA sprite_player + SPRITE_ATTRIB
     LDA #128    ; X pos
     STA sprite_player + SPRITE_X
+
+    ; Initialise enemies
+    LDX #0
+    LDA #ENEMY_SQUAD_HEIGHT * ENEMY_SPACING
+    STA temp_y
+    LDA #ENEMY_SQUAD_WIDTH * ENEMY_SPACING
+    STA temp_x
+    STA sprite_enemy+SPRITE_X, x 
+    LDA temp_y
+    STA sprite_enemy+SPRITE_Y, x 
+    LDA #1
+    STA sprite_enemy+SPRITE_TILE, x 
+    LDA #0
+    STA sprite_enemy+SPRITE_ATTRIB, x 
+
 
     LDA #%10000000 ; Enable NMI
     STA PPUCTRL
