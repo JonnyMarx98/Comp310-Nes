@@ -29,9 +29,11 @@ BUTTON_RIGHT  = %00000001
     .rsset $0010
 
 joypad1_state      .rs 1
+bullet_active      .rs 1
 
     .rsset $0200
 sprite_player      .rs 4
+sprite_bullet      .rs 4
 
     .rsset $0000
 SPRITE_Y           .rs 1
@@ -131,7 +133,7 @@ vblankwait2:
     STA sprite_player + SPRITE_Y
     LDA #0      ; Tile No.
     STA sprite_player + SPRITE_TILE
-    LDA #%10000000     ; Attributes (different palettes?)
+    LDA #0   ; Attributes (different palettes?)
     STA sprite_player + SPRITE_ATTRIB
     LDA #128    ; X pos
     STA sprite_player + SPRITE_X
@@ -172,10 +174,10 @@ ReadController:
     LDA joypad1_state
     AND #BUTTON_RIGHT
     BEQ ReadRight_Done ; if ((JOY1 & 1)) != 0 {
-    LDA $0203
+    LDA sprite_player + SPRITE_X
     CLC 
     ADC #1
-    STA $0203
+    STA sprite_player + SPRITE_X
                 ; }
 ReadRight_Done:
 
@@ -183,10 +185,10 @@ ReadRight_Done:
     LDA joypad1_state
     AND #BUTTON_DOWN
     BEQ ReadDown_Done ; if ((JOY1 & 1)) != 0 {
-    LDA $0200
+    LDA sprite_player + SPRITE_Y
     CLC 
     ADC #1
-    STA $0200
+    STA sprite_player + SPRITE_Y
                 ; }
 ReadDown_Done:
 
@@ -194,10 +196,10 @@ ReadDown_Done:
     LDA joypad1_state
     AND #BUTTON_LEFT
     BEQ ReadLeft_Done ; if ((JOY1 & 1)) != 0 {
-    LDA $0203
+    LDA sprite_player + SPRITE_X
     SEC 
     SBC #1
-    STA $0203
+    STA sprite_player + SPRITE_X
                 ; }
 ReadLeft_Done:
 
@@ -205,13 +207,49 @@ ReadLeft_Done:
     LDA joypad1_state
     AND #BUTTON_UP
     BEQ ReadUp_Done ; if ((JOY1 & 1)) != 0 {
-    LDA $0200
+    LDA sprite_player + SPRITE_Y
     SEC 
     SBC #1
-    STA $0200
+    STA sprite_player + SPRITE_Y
                 ; }
 ReadUp_Done:
 
+    ; React to A button
+
+    LDA joypad1_state
+    AND #BUTTON_A
+    BEQ ReadA_Done ; if ((JOY1 & 1)) != 0 {
+    ; Spawn a bullet
+    LDA bullet_active
+    BNE ReadA_Done    ; check if bullet is active (checks if bullet_active is not equal to 0)
+    ; No bullet active, so spawn a new one
+    LDA #1
+    STA bullet_active
+    LDA sprite_player + SPRITE_Y   ; Y pos
+    STA sprite_bullet + SPRITE_Y
+    LDA #2      ; Tile No.
+    STA sprite_bullet + SPRITE_TILE
+    LDA #0      ; Attributes (different palettes?)
+    STA sprite_bullet + SPRITE_ATTRIB
+    LDA sprite_player + SPRITE_X   ; X pos
+    STA sprite_bullet + SPRITE_X
+
+ReadA_Done:
+
+    ; Update the bullet
+    LDA bullet_active
+    BEQ UpdateBullet_Done
+    LDA sprite_bullet + SPRITE_Y
+    SEC
+    SBC #1
+    STA sprite_bullet + SPRITE_Y
+    BCS UpdateBullet_Done
+    ; If carry flag is clear, bullet has left the top of the screen -- destroy it
+    LDA #0
+    STA bullet_active
+
+UpdateBullet_Done:
+    
 
     ; copy sprite data to ppu
     LDA #0
