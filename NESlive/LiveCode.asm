@@ -17,6 +17,19 @@ OAMDMA    = $4014
 JOY1      = $4016
 JOY2      = $4017
 
+BUTTON_A      = %10000000
+BUTTON_B      = %01000000
+BUTTON_SELECT = %00100000
+BUTTON_START  = %00010000
+BUTTON_UP     = %00001000
+BUTTON_DOWN   = %00000100
+BUTTON_LEFT   = %00000010
+BUTTON_RIGHT  = %00000001
+
+    .rsset $0010
+
+joypad1_state      .rs 1
+
     .bank 0
     .org $C000
 
@@ -133,29 +146,61 @@ NMI:
     LDA #0
     STA JOY1
 
-    ; Read A button
+    ;Read joypad state
+    LDX #0
+    STX joypad1_state
+ReadController:
     LDA JOY1
-    AND #%00000001
-    STA $0010
-    BEQ ReadA_Done ; if ((JOY1 & 1)) != 0 {
+    LSR A
+    ROL joypad1_state
+    INX 
+    CPX #8
+    BNE ReadController
+
+
+    ; React to Right button
+    LDA joypad1_state
+    AND #BUTTON_RIGHT
+    BEQ ReadRight_Done ; if ((JOY1 & 1)) != 0 {
     LDA $0203
     CLC 
     ADC #1
     STA $0203
                 ; }
-ReadA_Done:
+ReadRight_Done:
 
-     ; Read B button
-    LDA JOY1
-    AND #%00000001
-    STA $0010
-    BEQ ReadB_Done ; if ((JOY1 & 1)) != 0 {
+     ; Read Down button
+    LDA joypad1_state
+    AND #BUTTON_DOWN
+    BEQ ReadDown_Done ; if ((JOY1 & 1)) != 0 {
     LDA $0200
     CLC 
     ADC #1
     STA $0200
                 ; }
-ReadB_Done:
+ReadDown_Done:
+
+    ; React to Left button
+    LDA joypad1_state
+    AND #BUTTON_LEFT
+    BEQ ReadLeft_Done ; if ((JOY1 & 1)) != 0 {
+    LDA $0203
+    SEC 
+    SBC #1
+    STA $0203
+                ; }
+ReadLeft_Done:
+
+     ; Read Up button
+    LDA joypad1_state
+    AND #BUTTON_UP
+    BEQ ReadUp_Done ; if ((JOY1 & 1)) != 0 {
+    LDA $0200
+    SEC 
+    SBC #1
+    STA $0200
+                ; }
+ReadUp_Done:
 
 
     ; copy sprite data to ppu
