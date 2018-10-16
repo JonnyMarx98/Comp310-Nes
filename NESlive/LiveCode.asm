@@ -14,7 +14,8 @@ PPUSCROLL = $2005
 PPUADDR   = $2006
 PPUDATA   = $2007
 OAMDMA    = $4014
-
+JOY1      = $4016
+JOY2      = $4017
 
     .bank 0
     .org $C000
@@ -91,7 +92,7 @@ vblankwait2:
     STA PPUADDR
 
     ; Write the background colour
-    LDA #$0F
+    LDA #$29
     STA PPUDATA
 
     ; Write the palette colours
@@ -100,15 +101,6 @@ vblankwait2:
     LDA #$1C
     STA PPUDATA
     LDA #$2C
-    STA PPUDATA
-
-    LDA #$0F
-    STA PPUDATA
-    LDA #$30
-    STA PPUDATA
-    LDA #$26
-    STA PPUDATA
-    LDA #$05
     STA PPUDATA
 
     ; Write sprite data for sprite 0
@@ -120,16 +112,6 @@ vblankwait2:
     STA $0202
     LDA #128    ; X pos
     STA $0203
-
-    ; Write sprite data for sprite 1
-    LDA #60    ; Y pos
-    STA $0204
-    LDA #1      ; Tile No.
-    STA $0205
-    LDA #1      ; Attributes (different palettes?)
-    STA $0206
-    LDA #190    ; X pos
-    STA $0207
 
     LDA #%10000000 ; Enable NMI
     STA PPUCTRL
@@ -145,18 +127,38 @@ forever:
 
 ; NMI is called on every frame
 NMI:
-    ; Increment x pos of sprite
+    ; Initialise controller 1
+    LDA #1
+    STA JOY1
+    LDA #0
+    STA JOY1
+
+    ; Read A button
+    LDA JOY1
+    AND #%00000001
+    STA $0010
+    BEQ ReadA_Done ; if ((JOY1 & 1)) != 0 {
     LDA $0203
     CLC 
     ADC #1
     STA $0203
+                ; }
+ReadA_Done:
 
-     ; Increment y pos of sprite 
-    LDA $0204
+     ; Read B button
+    LDA JOY1
+    AND #%00000001
+    STA $0010
+    BEQ ReadB_Done ; if ((JOY1 & 1)) != 0 {
+    LDA $0200
     CLC 
     ADC #1
-    STA $0204
+    STA $0200
+                ; }
+ReadB_Done:
 
+
+    ; copy sprite data to ppu
     LDA #0
     STA OAMADDR 
     LDA #$02
