@@ -30,6 +30,16 @@ BUTTON_RIGHT  = %00000001
 
 joypad1_state      .rs 1
 
+    .rsset $0200
+sprite_player      .rs 4
+
+    .rsset $0000
+SPRITE_Y           .rs 1
+SPRITE_TILE        .rs 1
+SPRITE_ATTRIB      .rs 1
+SPRITE_X           .rs 1
+
+
     .bank 0
     .org $C000
 
@@ -118,13 +128,13 @@ vblankwait2:
 
     ; Write sprite data for sprite 0
     LDA #120    ; Y pos
-    STA $0200
+    STA sprite_player + SPRITE_Y
     LDA #0      ; Tile No.
-    STA $0201
+    STA sprite_player + SPRITE_TILE
     LDA #%10000000     ; Attributes (different palettes?)
-    STA $0202
+    STA sprite_player + SPRITE_ATTRIB
     LDA #128    ; X pos
-    STA $0203
+    STA sprite_player + SPRITE_X
 
     LDA #%10000000 ; Enable NMI
     STA PPUCTRL
