@@ -334,30 +334,38 @@ UpdateEnemies_Reverse:
     EOR #%01000000
     STA sprite_enemy+SPRITE_ATTRIB, x
 UpdateEnemies_NoReverse:
-    ; Check collision with bullet
+
+                               ;              \1         \2          \3          \4            \5            \6             \7
+CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, object_hit_y, object_hit_w, object_hit_h, no_collision_label
+    ; if there is a collision, execution continues immediately after this macro
+    ; else, jump to no_collision_label
     LDA sprite_enemy+SPRITE_X, x  ; Calculate x_enemy - w_bullet (x1-w2)
     SEC
-    SBC #BULLET_HITBOX_X 
+    SBC \3
     SEC
-    SBC #BULLET_HITBOX_WIDTH+1    ; Assume w2 = 8
-    CMP sprite_bullet+SPRITE_X    ; Compare with x_bullet (x2)
-    BCS UpdateEnemies_NoCollision ; Branch if x1-w2-1-BULLET_HITBOX_X >= x2  ie x1-w2 > x2
+    SBC \5+1                      ; Assume w2 = 8
+    CMP \1                        ; Compare with x_bullet (x2)
+    BCS \7                        ; Branch if x1-w2-1-BULLET_HITBOX_X >= x2  ie x1-w2 > x2
     CLC
-    ADC #ENEMY_HITBOX_WIDTH+ENEMY_HITBOX_WIDTH+1 ; Calculate x_enemy + w_enemy (x1+w1) assuming w1 = 8
-    CMP sprite_bullet+SPRITE_X    ; Compare with x_bullet (x2)
-    BCC UpdateEnemies_NoCollision ; Branch if x1+w1+1+BULLET_HITBOX_X <= x2
+    ADC \5+ENEMY_HITBOX_WIDTH+1   ; Calculate x_enemy + w_enemy (x1+w1) assuming w1 = 8
+    CMP \1                        ; Compare with x_bullet (x2)
+    BCC \7                        ; Branch if x1+w1+1+BULLET_HITBOX_X <= x2
 
     LDA sprite_enemy+SPRITE_Y, x  ; Calculate y_enemy - h_bullet (y1-h2)
     SEC
-    SBC #BULLET_HITBOX_X 
+    SBC \4 
     SEC
-    SBC #BULLET_HITBOX_WIDTH+1+BULLET_HITBOX_Y    ; Assume h2 = 8
-    CMP sprite_bullet+SPRITE_Y    ; Compare with y_bullet (y2)
-    BCS UpdateEnemies_NoCollision ; Branch if y1-h2-1-BULLET_HITBOX_Y >= y2
+    SBC \6+1                      ; Assume h2 = 8
+    CMP \2                        ; Compare with y_bullet (y2)
+    BCS \7                        ; Branch if y1-h2-1-BULLET_HITBOX_Y >= y2
     CLC
-    ADC #BULLET_HITBOX_WIDTH+ENEMY_HITBOX_WIDTH+1; Calculate y_enemy + h_enemy (y1+h1) assuming h1 = 8
-    CMP sprite_bullet+SPRITE_Y    ; Compare with y_bullet (y2)
-    BCC UpdateEnemies_NoCollision ; Branch if y1+h1+1+BULLET_HITBOX_Y <= y2    
+    ADC \6+ENEMY_HITBOX_WIDTH+1   ; Calculate y_enemy + h_enemy (y1+h1) assuming h1 = 8
+    CMP \2                        ; Compare with y_bullet (y2)
+    BCC \7                        ; Branch if y1+h1+1+BULLET_HITBOX_Y <= y2    
+    .endm
+
+    ; Check collision with bullet
+    CheckCollisionWithEnemy sprite_bullet+SPRITE_X, sprite_bullet+SPRITE_Y, #BULLET_HITBOX_X, #BULLET_HITBOX_Y, #BULLET_HITBOX_WIDTH, #BULLET_HITBOX_HEIGHT, UpdateEnemies_NoCollision
     ; Handle collision
     LDA #0
     STA bullet_active             ; Destroy the bullet
@@ -365,9 +373,14 @@ UpdateEnemies_NoReverse:
     LDA #$FF
     STA sprite_bullet+SPRITE_Y
     STA sprite_enemy+SPRITE_Y, x
-
-
 UpdateEnemies_NoCollision:
+
+    ; Check collision with bullet
+    CheckCollisionWithEnemy sprite_player+SPRITE_X, sprite_player+SPRITE_Y, #0, #0, #8, #8, UpdateEnemies_NoCollisionWithPlayer
+    ; Handle collision
+    NOP
+UpdateEnemies_NoCollisionWithPlayer:
+    
 UpdateEnemies_Next:
     ; Decrement X register by 4 (X - 4)
     DEX
