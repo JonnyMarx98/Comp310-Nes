@@ -36,6 +36,7 @@ player_position_sub .rs 1 ; in subpixels
 
     .rsset $0200
 sprite_player      .rs 4
+sprite_wall        .rs 4
 
     .rsset $0000
 SPRITE_Y           .rs 1
@@ -43,9 +44,9 @@ SPRITE_TILE        .rs 1
 SPRITE_ATTRIB      .rs 1
 SPRITE_X           .rs 1
 
-GRAVITY             = 20        ; in subpixels/frame^2
+GRAVITY             = 15        ; in subpixels/frame^2
 JUMP_SPEED          = -2 * 256  ; in subpixels/frame
-SCREEN_BOTTOM_Y        = 224
+SCREEN_BOTTOM_Y     = 224
 
     .bank 0
     .org $C000
@@ -291,6 +292,11 @@ ReadController:
     ; ADC #1
     ; STA sprite_player + SPRITE_X
                 ; }
+    LDA scroll_x
+    CLC
+    CMP #LOW(NametableData)
+    BCS WallCollision
+
 
     LDA scroll_x
     CLC
@@ -307,6 +313,15 @@ ReadController:
 Scroll_NoWrap:
     LDA #0
     STA PPUSCROLL
+    JMP ReadRight_Done
+WallCollision:
+    LDA sprite_player + SPRITE_Y
+    SEC 
+    SBC #1
+    STA sprite_player + SPRITE_Y
+    LDA #0
+    STA player_speed
+
 
 ReadRight_Done:
 
