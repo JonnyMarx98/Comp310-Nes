@@ -43,7 +43,7 @@ SPRITE_TILE        .rs 1
 SPRITE_ATTRIB      .rs 1
 SPRITE_X           .rs 1
 
-GRAVITY             = 10        ; in subpixels/frame^2
+GRAVITY             = 20        ; in subpixels/frame^2
 JUMP_SPEED          = -2 * 256  ; in subpixels/frame
 SCREEN_BOTTOM_Y        = 224
 
@@ -286,11 +286,28 @@ ReadController:
     LDA joypad1_state
     AND #BUTTON_RIGHT
     BEQ ReadRight_Done ; if ((JOY1 & 1)) != 0 {
-    LDA sprite_player + SPRITE_X
-    CLC 
-    ADC #1
-    STA sprite_player + SPRITE_X
+    ; LDA sprite_player + SPRITE_X
+    ; CLC 
+    ; ADC #1
+    ; STA sprite_player + SPRITE_X
                 ; }
+
+    LDA scroll_x
+    CLC
+    ADC #1
+    STA scroll_x
+    STA PPUSCROLL
+    BCC Scroll_NoWrap
+    ; scroll_x has wrapped, so switch scroll_page
+    LDA scroll_page
+    EOR #1
+    STA scroll_page
+    ORA #%10000000
+    STA PPUCTRL
+Scroll_NoWrap:
+    LDA #0
+    STA PPUSCROLL
+
 ReadRight_Done:
 
      ; Read Down button
@@ -308,11 +325,27 @@ ReadDown_Done:
     LDA joypad1_state
     AND #BUTTON_LEFT
     BEQ ReadLeft_Done ; if ((JOY1 & 1)) != 0 {
-    LDA sprite_player + SPRITE_X
-    SEC 
-    SBC #1
-    STA sprite_player + SPRITE_X
+    ; LDA sprite_player + SPRITE_X
+    ; SEC 
+    ; SBC #1
+    ; STA sprite_player + SPRITE_X
                 ; }
+    LDA scroll_x
+    SEC
+    SBC #1
+    STA scroll_x
+    STA PPUSCROLL
+    BCC Scroll_NoWrap2
+    ; scroll_x has wrapped, so switch scroll_page
+    LDA scroll_page
+    EOR #1
+    STA scroll_page
+    ORA #%10000000
+    STA PPUCTRL
+Scroll_NoWrap2:
+    LDA #0
+    STA PPUSCROLL
+    
 ReadLeft_Done:
 
      ; Read Up button
@@ -325,7 +358,12 @@ ReadLeft_Done:
     ; STA sprite_player + SPRITE_Y
                 ; }
 
-    ; Set player speed
+    ; Check if player is on ground
+    LDA #SCREEN_BOTTOM_Y - 2    ; Load ScreenBottom into accumulator
+    CLC                         ; clear carry flag
+    CMP sprite_player+SPRITE_Y  ; if ScreenBottom >= PlayerY set carry flag
+    BCS ReadUp_Done
+    ; Jump by setting player speed
     LDA #LOW(JUMP_SPEED)
     STA player_speed
     LDA #HIGH(JUMP_SPEED)
@@ -333,21 +371,21 @@ ReadLeft_Done:
 ReadUp_Done:
 
     ; Scroll
-    LDA scroll_x
-    CLC
-    ADC #1
-    STA scroll_x
-    STA PPUSCROLL
-    BCC Scroll_NoWrap
-    ; scroll_x has wrapped, so switch scroll_page
-    LDA scroll_page
-    EOR #1
-    STA scroll_page
-    ORA #%10000000
-    STA PPUCTRL
-Scroll_NoWrap:
-    LDA #0
-    STA PPUSCROLL
+;     LDA scroll_x
+;     CLC
+;     ADC #1
+;     STA scroll_x
+;     STA PPUSCROLL
+;     BCC Scroll_NoWrap
+;     ; scroll_x has wrapped, so switch scroll_page
+;     LDA scroll_page
+;     EOR #1
+;     STA scroll_page
+;     ORA #%10000000
+;     STA PPUCTRL
+; Scroll_NoWrap:
+;     LDA #0
+;     STA PPUSCROLL
 
     ; Update player sprite
     ; First, update speed
@@ -373,6 +411,9 @@ Scroll_NoWrap:
     BCC UpdatePlayer_NoClamp
     LDA #SCREEN_BOTTOM_Y-1
     STA sprite_player+SPRITE_Y
+    LDA #0                  ; Set player speed to zero
+    STA player_speed        ; (both bytes)
+    STA player_speed+1
 UpdatePlayer_NoClamp:
 
     ; copy sprite data to ppu
