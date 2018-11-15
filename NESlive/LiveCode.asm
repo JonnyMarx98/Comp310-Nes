@@ -27,10 +27,12 @@ BUTTON_LEFT   = %00000010
 BUTTON_RIGHT  = %00000001
 
     .rsset $0010
-joypad1_state      .rs 1
-nametable_address  .rs 2
-scroll_x           .rs 1
-scroll_page        .rs 1
+joypad1_state       .rs 1
+nametable_address   .rs 2
+scroll_x            .rs 1
+scroll_page         .rs 1
+player_speed        .rs 2 ; in subpixels/frame -- 16bits
+player_position_sub .rs 1 ; in subpixels
 
     .rsset $0200
 sprite_player      .rs 4
@@ -40,6 +42,10 @@ SPRITE_Y           .rs 1
 SPRITE_TILE        .rs 1
 SPRITE_ATTRIB      .rs 1
 SPRITE_X           .rs 1
+
+GRAVITY             = 10        ; in subpixels/frame^2
+JUMP_SPEED          = -2 * 256  ; in subpixels/frame
+SCREEN_BOTTOM_Y        = 224
 
     .bank 0
     .org $C000
@@ -209,7 +215,7 @@ LoadNametable_End:
     LDA #$C0
     STA PPUADDR
 
-    LDA #%00000000
+    LDA #%01010101
     LDX #64
 LoadAttributes_Loop:
     STA PPUDATA
@@ -313,11 +319,17 @@ ReadLeft_Done:
     LDA joypad1_state
     AND #BUTTON_UP
     BEQ ReadUp_Done ; if ((JOY1 & 1)) != 0 {
-    LDA sprite_player + SPRITE_Y
-    SEC 
-    SBC #1
-    STA sprite_player + SPRITE_Y
+    ; LDA sprite_player + SPRITE_Y
+    ; SEC 
+    ; SBC #1
+    ; STA sprite_player + SPRITE_Y
                 ; }
+
+    ; Set player speed
+    LDA #LOW(JUMP_SPEED)
+    STA player_speed
+    LDA #HIGH(JUMP_SPEED)
+    STA player_speed+1
 ReadUp_Done:
 
     ; Scroll
@@ -337,6 +349,31 @@ Scroll_NoWrap:
     LDA #0
     STA PPUSCROLL
 
+    ; Update player sprite
+    ; First, update speed
+    LDA player_speed    ; Low 8 bits
+    CLC
+    ADC #LOW(GRAVITY)
+    STA player_speed
+    LDA player_speed+1  ; High 8 bits
+    ADC #HIGH(GRAVITY)  ; NB: *don't* clear the carry flag!
+    STA player_speed+1
+
+    ; Second, update position
+    LDA player_position_sub    ; Low 8 bits
+    CLC
+    ADC player_speed
+    STA player_position_sub
+    LDA sprite_player+SPRITE_Y ; High 8 bits
+    ADC player_speed+1         ; NB: *don't* clear the carry flag!
+    STA sprite_player+SPRITE_Y
+
+    ; Check for the bottom of screen
+    CMP #SCREEN_BOTTOM_Y    ; Accumulator
+    BCC UpdatePlayer_NoClamp
+    LDA #SCREEN_BOTTOM_Y-1
+    STA sprite_player+SPRITE_Y
+UpdatePlayer_NoClamp:
 
     ; copy sprite data to ppu
     LDA #0
