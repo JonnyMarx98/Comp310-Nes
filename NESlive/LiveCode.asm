@@ -272,6 +272,26 @@ LoadAttributes2_Loop:
 
 ; NMI is called on every frame
 NMI:
+
+                                   ;            \1       \2       \3      \4        \5            \6             \7
+CheckCollisionWithWall .macro ; parameters: scroll_x, player_y, wall_x, wall_y, object_hit_w, object_hit_h, no_collision_label
+    ; if there is a collision, execution continues immediately after this macro
+    ; else, jump to no_collision_label
+    LDA \1
+    CLC
+    CMP \3
+    BCC \7
+    CLC
+    CMP \3 + \5 + 5
+    BCS \7
+    LDA #SCREEN_BOTTOM_Y    ; Calculate screen_bottom - object_h
+    SEC
+    SBC \6 - 8
+    ;CLC
+    CMP \2
+    BCS \7
+    .endm
+
     ; Initialise controller 1
     LDA #1
     STA JOY1
@@ -299,14 +319,33 @@ ReadController:
     ; ADC #1
     ; STA sprite_player + SPRITE_X
                 ; }
-    
-    ; TO DO, find actual position of pipes and loop through them to check collision.
-    ; LDA scroll_x
-    ; CLC
-    ; CMP #28
-    ; BCS WallCollision
 
+                 ; parameters: scroll_x, scroll_y, wall_x, wall_y, wall_w, wall_h, no_collision_label
+                 ; Subtract 1 from wall_w so you can move off the wall
+    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x+6), #64, #63, #64, NextCollision
+    ; Handle Collision
+    ; TODO make this a macro
+    LDA sprite_player + SPRITE_Y
+    SEC 
+    SBC #1
+    STA sprite_player + SPRITE_Y
+    LDA #0
+    STA player_speed
+    JMP ReadRight_Done
+NextCollision:
+                 ; parameters: scroll_x, scroll_y, wall_x, wall_y, wall_w, wall_h, no_collision_label
+                 ; Subtract 1 from wall_w so you can move off the wall
+    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x-106), #64, #31, #96, NoWallCollision
+    ; Handle Collision
+    LDA sprite_player + SPRITE_Y
+    SEC 
+    SBC #1
+    STA sprite_player + SPRITE_Y
+    LDA #0
+    STA player_speed
+    JMP ReadRight_Done
 
+NoWallCollision:
     LDA scroll_x
     CLC
     ADC #1
@@ -323,13 +362,7 @@ Scroll_NoWrap:
     LDA #0
     STA PPUSCROLL
     JMP ReadRight_Done
-WallCollision:
-    LDA sprite_player + SPRITE_Y
-    SEC 
-    SBC #1
-    STA sprite_player + SPRITE_Y
-    LDA #0
-    STA player_speed
+    
 
 
 ReadRight_Done:
@@ -354,6 +387,34 @@ ReadDown_Done:
     ; SBC #1
     ; STA sprite_player + SPRITE_X
                 ; }
+
+                 ; parameters: scroll_x, scroll_y, wall_x, wall_y, wall_w, wall_h, no_collision_label
+                 ; Add 1 to wall_x so you can move off the wall
+                 ; Subtract 1 from wall_w to compensate 
+    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x+7), #64, #63, #64, NextCollision2 
+    ; Handle Collision
+    LDA sprite_player + SPRITE_Y
+    SEC 
+    SBC #1
+    STA sprite_player + SPRITE_Y
+    LDA #0
+    STA player_speed
+    JMP ReadLeft_Done
+NextCollision2:
+                 ; parameters: scroll_x, scroll_y, wall_x, wall_y, wall_w, wall_h, no_collision_label
+                 ; Add 1 to wall_x so you can move off the wall
+                 ; Subtract 1 from wall_w to compensate 
+    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x-105), #64, #31, #96, NoWallCollision2 
+    ; Handle Collision
+    LDA sprite_player + SPRITE_Y
+    SEC 
+    SBC #1
+    STA sprite_player + SPRITE_Y
+    LDA #0
+    STA player_speed
+    JMP ReadLeft_Done
+
+NoWallCollision2:
     LDA scroll_x
     SEC
     SBC #1
@@ -369,6 +430,13 @@ ReadDown_Done:
 Scroll_NoWrap2:
     LDA #0
     STA PPUSCROLL
+; WallCollision2:
+;     LDA sprite_player + SPRITE_Y
+;     SEC 
+;     SBC #1
+;     STA sprite_player + SPRITE_Y
+;     LDA #0
+;     STA player_speed
     
 ReadLeft_Done:
 
@@ -415,6 +483,7 @@ ReadUp_Done:
     STA sprite_bullet + SPRITE_X
 
 ReadA_Done:
+
 
 ; Update the bullet
     LDA bullet_active
