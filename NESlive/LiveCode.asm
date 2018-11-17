@@ -32,14 +32,18 @@ WALL_HITBOX_X      = 3 ; Relative to sprite top left corner
 WALL_HITBOX_Y      = 1
 
     .rsset $0010
-joypad1_state       .rs 1
-nametable_address   .rs 2
-bullet_active       .rs 1
-scroll_x            .rs 1
-scroll_page         .rs 1
-player_speed        .rs 2 ; in subpixels/frame -- 16bits
-player_position_sub .rs 1 ; in subpixels
-
+joypad1_state            .rs 1
+nametable_address        .rs 2
+bullet_active            .rs 1
+bullet_direction         .rs 1
+scroll_x                 .rs 1
+screen_bottom            .rs 1
+climbing_right_active   .rs 1
+climbing_left_active    .rs 1
+scroll_page              .rs 1
+player_speed             .rs 2 ; in subpixels/frame -- 16bits
+player_position_sub      .rs 1 ; in subpixels
+     
     .rsset $0200
 sprite_player      .rs 4
 sprite_bullet      .rs 4
@@ -53,7 +57,7 @@ SPRITE_X           .rs 1
 
 GRAVITY             = 15        ; in subpixels/frame^2
 JUMP_SPEED          = -2 * 256  ; in subpixels/frame
-SCREEN_BOTTOM_Y     = 224
+SCREEN_BOTTOM       = 224
 
     .bank 0
     .org $C000
@@ -265,7 +269,7 @@ LoadAttributes2_Loop:
     DEX
     BNE LoadAttributes2_Loop
     
-
+    
 
     RTS ; End subroutine
 ; ----------------------------------------------------------------------------
@@ -274,23 +278,80 @@ LoadAttributes2_Loop:
 NMI:
 
                                    ;            \1       \2       \3      \4        \5            \6             \7
-CheckCollisionWithWall .macro ; parameters: scroll_x, player_y, wall_x, wall_y, object_hit_w, object_hit_h, no_collision_label
+CheckCollisionWithWall .macro ; parameters: scroll_x, player_y, wall_x, wall_y, wall_w, wall_h, no_collision_label
     ; if there is a collision, execution continues immediately after this macro
     ; else, jump to no_collision_label
-    LDA \1
+    LDA \1      ; scroll_x
     CLC
-    CMP \3
+    CMP \3      ; if scroll_x >= wall_x set carry flag, else no collision 
     BCC \7
     CLC
-    CMP \3 + \5 + 5
+    CMP \3 + \5 + 5     ; if scroll_x >= wall_x + wall_w then no collision, else check Y collision
     BCS \7
-    LDA #SCREEN_BOTTOM_Y    ; Calculate screen_bottom - object_h
+    LDA #SCREEN_BOTTOM    ; Calculate screen_bottom - wall_h
     SEC
     SBC \6 - 8
-    ;CLC
     CMP \2
-    BCS \7
+    BCS \8   
     .endm
+
+SetCollisionActive .macro ; params: collision_active (left or right), wall_h
+    LDA #1
+    STA \1
+    .endm
+
+SetBottom .macro    ; params: wall_h
+    LDA #(SCREEN_BOTTOM + 8 - \1)
+    STA screen_bottom
+    JMP NoActiveCollision
+    .endm
+
+    ; RIGHT COLLISIONS
+    ; parameters: scroll_x, player_y, wall_x, wall_y, wall_w, wall_h, no_collision_label
+    ; Subtract 1 from wall_w so you can move off the wall
+    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x+6), #64, #63, #64, NoCollision1, OnTop1
+    SetCollisionActive climbing_right_active
+    JMP CollisionChecksDone
+OnTop1:
+    SetBottom #64
+NoCollision1:
+    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x-106), #64, #31, #96, NoCollision2, OnTop2
+    SetCollisionActive climbing_right_active
+    JMP CollisionChecksDone
+OnTop2:
+    SetBottom #96
+NoCollision2:
+    ; LEFT COLLISIONS
+    ; Add 1 to wall_x so you can move off the wall
+    ; Subtract 1 from wall_w to compensate 
+    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x+7), #64, #63, #64, NoCollision3, OnTop3
+    SetCollisionActive climbing_left_active
+    JMP CollisionChecksDone
+OnTop3:
+    SetBottom #64
+NoCollision3:
+    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x-105), #64, #31, #96, NoCollision4, OnTop4
+    SetCollisionActive climbing_left_active
+    JMP CollisionChecksDone
+OnTop4:
+    SetBottom #96
+NoCollision4:
+    ;  Reset floor
+    LDA #224
+    STA screen_bottom
+NoActiveCollision:
+    LDA #0
+    STA climbing_right_active
+    LDA #0
+    STA climbing_left_active    
+CollisionChecksDone:
+
+
+    ; Initialise controller 1
+    LDA #1
+    STA JOY1
+    LDA #0
+    STA JOY1
 
     ; Initialise controller 1
     LDA #1
@@ -313,29 +374,10 @@ ReadController:
     ; React to Right button
     LDA joypad1_state
     AND #BUTTON_RIGHT
-    BEQ ReadRight_Done ; if ((JOY1 & 1)) != 0 {
-    ; LDA sprite_player + SPRITE_X
-    ; CLC 
-    ; ADC #1
-    ; STA sprite_player + SPRITE_X
-                ; }
-
-                 ; parameters: scroll_x, scroll_y, wall_x, wall_y, wall_w, wall_h, no_collision_label
-                 ; Subtract 1 from wall_w so you can move off the wall
-    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x+6), #64, #63, #64, NextCollision
-    ; Handle Collision
+    BEQ ReadRight_Done
     ; TODO make this a macro
-    LDA sprite_player + SPRITE_Y
-    SEC 
-    SBC #1
-    STA sprite_player + SPRITE_Y
-    LDA #0
-    STA player_speed
-    JMP ReadRight_Done
-NextCollision:
-                 ; parameters: scroll_x, scroll_y, wall_x, wall_y, wall_w, wall_h, no_collision_label
-                 ; Subtract 1 from wall_w so you can move off the wall
-    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x-106), #64, #31, #96, NoWallCollision
+    LDA climbing_right_active
+    BEQ NoWallCollision
     ; Handle Collision
     LDA sprite_player + SPRITE_Y
     SEC 
@@ -346,6 +388,8 @@ NextCollision:
     JMP ReadRight_Done
 
 NoWallCollision:
+    LDA #0
+    STA climbing_right_active
     LDA scroll_x
     CLC
     ADC #1
@@ -382,30 +426,10 @@ ReadDown_Done:
     LDA joypad1_state
     AND #BUTTON_LEFT
     BEQ ReadLeft_Done ; if ((JOY1 & 1)) != 0 {
-    ; LDA sprite_player + SPRITE_X
-    ; SEC 
-    ; SBC #1
-    ; STA sprite_player + SPRITE_X
-                ; }
 
-                 ; parameters: scroll_x, scroll_y, wall_x, wall_y, wall_w, wall_h, no_collision_label
-                 ; Add 1 to wall_x so you can move off the wall
-                 ; Subtract 1 from wall_w to compensate 
-    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x+7), #64, #63, #64, NextCollision2 
-    ; Handle Collision
-    LDA sprite_player + SPRITE_Y
-    SEC 
-    SBC #1
-    STA sprite_player + SPRITE_Y
-    LDA #0
-    STA player_speed
-    JMP ReadLeft_Done
-NextCollision2:
-                 ; parameters: scroll_x, scroll_y, wall_x, wall_y, wall_w, wall_h, no_collision_label
-                 ; Add 1 to wall_x so you can move off the wall
-                 ; Subtract 1 from wall_w to compensate 
-    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x-105), #64, #31, #96, NoWallCollision2 
-    ; Handle Collision
+    ; If Colliding 
+    LDA climbing_left_active
+    BEQ NoWallCollision2
     LDA sprite_player + SPRITE_Y
     SEC 
     SBC #1
@@ -415,6 +439,8 @@ NextCollision2:
     JMP ReadLeft_Done
 
 NoWallCollision2:
+    LDA #0
+    STA climbing_left_active
     LDA scroll_x
     SEC
     SBC #1
@@ -430,28 +456,18 @@ NoWallCollision2:
 Scroll_NoWrap2:
     LDA #0
     STA PPUSCROLL
-; WallCollision2:
-;     LDA sprite_player + SPRITE_Y
-;     SEC 
-;     SBC #1
-;     STA sprite_player + SPRITE_Y
-;     LDA #0
-;     STA player_speed
     
 ReadLeft_Done:
 
      ; Read Up button
     LDA joypad1_state
     AND #BUTTON_UP
-    BEQ ReadUp_Done ; if ((JOY1 & 1)) != 0 {
-    ; LDA sprite_player + SPRITE_Y
-    ; SEC 
-    ; SBC #1
-    ; STA sprite_player + SPRITE_Y
-                ; }
+    BEQ ReadUp_Done
 
     ; Check if player is on ground
-    LDA #SCREEN_BOTTOM_Y - 2    ; Load ScreenBottom into accumulator
+    LDA screen_bottom ;#SCREEN_BOTTOM_Y - 2    ; Load ScreenBottom into accumulator
+    SEC
+    SBC #2
     CLC                         ; clear carry flag
     CMP sprite_player+SPRITE_Y  ; if ScreenBottom >= PlayerY set carry flag
     BCS ReadUp_Done
@@ -473,6 +489,8 @@ ReadUp_Done:
     ; No bullet active, so spawn a new one
     LDA #1
     STA bullet_active
+    LDA #0
+    STA bullet_direction
     LDA sprite_player + SPRITE_Y   ; Y pos
     STA sprite_bullet + SPRITE_Y
     LDA #2      ; Tile No.
@@ -484,38 +502,58 @@ ReadUp_Done:
 
 ReadA_Done:
 
+; React to B button
+
+    LDA joypad1_state
+    AND #BUTTON_B
+    BEQ ReadB_Done ; if ((JOY1 & 1)) != 0 {
+    ; Spawn a bullet
+    LDA bullet_active
+    BNE ReadB_Done    ; check if bullet is active (checks if bullet_active is not equal to 0)
+    ; No bullet active, so spawn a new one
+    LDA #1
+    STA bullet_active
+    STA bullet_direction
+    LDA sprite_player + SPRITE_Y   ; Y pos
+    STA sprite_bullet + SPRITE_Y
+    LDA #2      ; Tile No.
+    STA sprite_bullet + SPRITE_TILE
+    LDA #0      ; Attributes (different palettes?)
+    STA sprite_bullet + SPRITE_ATTRIB
+    LDA sprite_player + SPRITE_X   ; X pos
+    STA sprite_bullet + SPRITE_X
+    ; Flip the sprite
+    LDA sprite_bullet+SPRITE_ATTRIB
+    EOR #%01000000
+    STA sprite_bullet+SPRITE_ATTRIB
+
+ReadB_Done:
 
 ; Update the bullet
     LDA bullet_active
     BEQ UpdateBullet_Done
+    LDA bullet_direction
+    BEQ ShootRight
+    LDA sprite_bullet + SPRITE_X
+    SEC
+    SBC #4
+    STA sprite_bullet + SPRITE_X
+    BCS UpdateBullet_Done
+    ; If carry flag is clear, bullet has left the top of the screen -- destroy it
+    LDA #0
+    STA bullet_active
+    JMP UpdateBullet_Done
+ShootRight:
     LDA sprite_bullet + SPRITE_X
     CLC 
-    ADC #2
-    STA sprite_bullet + SPRITE_X
+    ADC #4
+    STA sprite_bullet + SPRITE_X    
     BCC UpdateBullet_Done
     ; If carry flag is clear, bullet has left the top of the screen -- destroy it
     LDA #0
     STA bullet_active
 
 UpdateBullet_Done:
-
-    ; Scroll
-;     LDA scroll_x
-;     CLC
-;     ADC #1
-;     STA scroll_x
-;     STA PPUSCROLL
-;     BCC Scroll_NoWrap
-;     ; scroll_x has wrapped, so switch scroll_page
-;     LDA scroll_page
-;     EOR #1
-;     STA scroll_page
-;     ORA #%10000000
-;     STA PPUCTRL
-; Scroll_NoWrap:
-;     LDA #0
-;     STA PPUSCROLL
-
     ; Update player sprite
     ; First, update speed
     LDA player_speed    ; Low 8 bits
@@ -536,9 +574,11 @@ UpdateBullet_Done:
     STA sprite_player+SPRITE_Y
 
     ; Check for the bottom of screen
-    CMP #SCREEN_BOTTOM_Y    ; Accumulator
+    CMP screen_bottom ;#SCREEN_BOTTOM_Y    ; Accumulator
     BCC UpdatePlayer_NoClamp
-    LDA #SCREEN_BOTTOM_Y-1
+    LDA screen_bottom;#SCREEN_BOTTOM_Y-1
+    SEC
+    SBC #1
     STA sprite_player+SPRITE_Y
     LDA #0                  ; Set player speed to zero
     STA player_speed        ; (both bytes)
