@@ -341,6 +341,14 @@ ResetPlayerSpeed .macro
     STA player_speed+1
     .endm
 
+PlayerJump .macro 
+    ; Jump by setting player speed
+    LDA #LOW(JUMP_SPEED)
+    STA player_speed
+    LDA #HIGH(JUMP_SPEED)
+    STA player_speed+1
+    .endm
+
 ScrollBackground .macro  ; params: Left(0) or Right(1), no_scroll_label
     LDA scroll_x
     .if \1 < 1                                      ; If direction is 0 scroll left, else scroll right 
@@ -437,10 +445,7 @@ Scroll_NoWrap:
     BNE WallJumpRight           ; If player is on a left wall, branch to WallJumpRight
     JMP ReadRight_Done
 WallJumpRight:
-    LDA #LOW(JUMP_SPEED)
-    STA player_speed
-    LDA #HIGH(JUMP_SPEED)
-    STA player_speed+1
+    PlayerJump
 ReadRight_Done:
      ; Read Down button
     LDA joypad1_state
@@ -472,10 +477,7 @@ Scroll_NoWrap2:
     BNE WallJumpLeft           ; If player is on a right wall, branch to WallJumpLeft
     JMP ReadLeft_Done
 WallJumpLeft:
-    LDA #LOW(JUMP_SPEED)
-    STA player_speed
-    LDA #HIGH(JUMP_SPEED)
-    STA player_speed+1
+    PlayerJump
     
 ReadLeft_Done:
 
@@ -491,11 +493,7 @@ ReadLeft_Done:
     CLC                         ; clear carry flag
     CMP sprite_player+SPRITE_Y  ; if ScreenBottom >= PlayerY set carry flag
     BCS ReadUp_Done
-    ; Jump by setting player speed
-    LDA #LOW(JUMP_SPEED)
-    STA player_speed
-    LDA #HIGH(JUMP_SPEED)
-    STA player_speed+1
+    PlayerJump
 
 ReadUp_Done:
 
