@@ -56,6 +56,7 @@ JUMP_SPEED          = -2 * 256  ; in subpixels/frame
 SCREEN_BOTTOM       = 224
 
 PLAYER_HEIGHT       = 8
+PLAYER_X_OFFSET     = 6
 
 WALL1_X       = (scroll_x+5)
 WALL1_Y       = 64
@@ -294,91 +295,102 @@ LoadAttributes2_Loop:
 ; NMI is called on every frame
 NMI:
 
-                                   ;            \1       \2       \3      \4        \5            \6             \7
-CheckCollisionWithWall .macro ; parameters: scroll_x, player_y, wall_x, wall_y, wall_w, wall_h, no_collision_label
+                                   ;            \1       \2       \3      \4        \5            \6             \7   
+CheckCollisionWithWall .macro ; parameters: scroll_x, player_y, wall_x, wall_w, wall_h, no_collision_label, on_top_label
     ; if there is a collision, execution continues immediately after this macro
     ; else, jump to no_collision_label
-    LDA \1      ; scroll_x
+    LDA \1                              
     CLC
-    CMP \3      ; if scroll_x >= wall_x set carry flag, else no collision 
-    BCC \7
+    CMP \3                                         ; if scroll_x >= wall_x check next collision, else branch to no_collision_label 
+    BCC \6
     CLC
-    CMP \3 + \5 + 5     ; if scroll_x >= wall_x + wall_w then no collision, else check Y collision
-    BCS \7
-    LDA #SCREEN_BOTTOM    ; Calculate screen_bottom - wall_h
+    CMP \3 + \4 + (PLAYER_X_OFFSET-1)              ; if scroll_x >= wall_x + wall_w + player_x_offset then no collision, else check Y collision
+    BCS \6
+    ; Check if player Y collision with wall height
+    LDA #SCREEN_BOTTOM                             ; Calculate screen_bottom - wall_h
     SEC
-    SBC \6 - 8
-    CMP \2
-    BCS \8   
+    SBC \5 - PLAYER_HEIGHT
+    CMP \2                                         ; If Screen_botttom - wall_h - Player_height >= player_y then player is on top of wall
+    BCS \7                                         ; Branch to the on_top_label 
     .endm
 
-SetCollisionActive .macro ; params: collision_active (left or right), wall_h
+SetCollisionActive .macro ; params: collision_active (left or right)
     LDA #1
     STA \1
     .endm
 
 SetBottom .macro    ; params: wall_h
-    LDA #(SCREEN_BOTTOM + 8 - \1)       ; Load in SCREEN BOTTOM + PLAYER HEIGHT - WALL HEIGHT 
+    LDA #(SCREEN_BOTTOM + PLAYER_HEIGHT - \1)       ; Load in SCREEN BOTTOM + PLAYER HEIGHT - WALL HEIGHT 
     STA screen_bottom
-    JMP NoActiveCollision
+    JMP NoClimbingActive
     .endm
 
 Climb .macro
-    LDA sprite_player + SPRITE_Y
+    LDA sprite_player + SPRITE_Y                    ; Load player Y into accumulator
     SEC 
-    SBC #1
-    STA sprite_player + SPRITE_Y
-    LDA #0
-    STA player_speed
+    SBC #1                                          ; Minus 1 from player Y
+    STA sprite_player + SPRITE_Y                    ; Store value back into player Y
+    ; Stop playing from falling from gravity (or moving up from jumping)
+    ResetPlayerSpeed
     .endm
 
 ResetPlayerSpeed .macro 
-    LDA #0
-    STA player_speed
+    LDA #0                                          ; Load 0 into accumulator
+    STA player_speed                                ; Store into player_speed and player_speed+1
     LDA #0
     STA player_speed+1
     .endm
 
+ScrollBackground .macro  ; params: Left(0) or Right(1), no_scroll_label
+    LDA scroll_x
+    .if \1 < 1                                      ; If direction is 0 scroll left, else scroll right 
+    SEC
+    SBC #1
+    .else
+    CLC 
+    ADC #1
+    .endif
+    STA scroll_x
+    STA PPUSCROLL
+    BCC \2
+    ; scroll_x has wrapped, so switch scroll_page
+    LDA scroll_page
+    EOR #1
+    STA scroll_page
+    ORA #%10000000
+    STA PPUCTRL
+    .endm
+
+CollisionCheck .macro
+    CheckCollisionWithWall \1, \2, \3, \4, \5, \6, \7
+    SetCollisionActive \8
+    JMP CollisionChecksDone
+\7:
+    SetBottom \5
+    .endm 
+
+
+    ; CollisionCheck parameters: scroll_x, player_y, wall_x, wall_w, wall_h, no_collision_label, on_top_label, climbing_active_direction
     ; RIGHT COLLISIONS
-    ; parameters: scroll_x, player_y, wall_x, wall_y, wall_w, wall_h, no_collision_label
-    ; Subtract 1 from wall_w so you can move off the wall
-    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #WALL1_X, #WALL1_Y, #WALL1_W/2, #WALL1_H, NoCollision1, OnTop1
-    SetCollisionActive climbing_right_active
-    JMP CollisionChecksDone
-OnTop1:
-    SetBottom #64
+    ; -1 from wall width to allow left collisions to work
+    CollisionCheck scroll_x, sprite_player+SPRITE_Y, #WALL1_X, #WALL1_W-1, #WALL1_H, NoCollision1, OnTop1, climbing_right_active
 NoCollision1:
-    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #WALL2_X, #WALL2_Y, #WALL2_W/2, #WALL2_H, NoCollision2, OnTop2
-    SetCollisionActive climbing_right_active
-    JMP CollisionChecksDone
-OnTop2:
-    SetBottom #96
+    CollisionCheck scroll_x, sprite_player+SPRITE_Y, #WALL2_X, #WALL2_W-1, #WALL2_H, NoCollision2, OnTop2, climbing_right_active
 NoCollision2:
     ; LEFT COLLISIONS
-    ; Add 1 to wall_x so you can move off the wall
-    ; Subtract 1 from wall_w to compensate 
-    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #WALL1_X, #WALL1_Y, #WALL1_W, #WALL1_H, NoCollision3, OnTop3
-    SetCollisionActive climbing_left_active
-    JMP CollisionChecksDone
-OnTop3:
-    SetBottom #64
+    CollisionCheck scroll_x, sprite_player+SPRITE_Y, #WALL1_X, #WALL1_W, #WALL1_H, NoCollision3, OnTop3, climbing_left_active
 NoCollision3:
-    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #WALL2_X, #WALL2_Y, #WALL2_W, #WALL2_H, NoCollision4, OnTop4
-    SetCollisionActive climbing_left_active
-    JMP CollisionChecksDone
-OnTop4:
-    SetBottom #96
+    CollisionCheck scroll_x, sprite_player+SPRITE_Y, #WALL2_X, #WALL2_W, #WALL2_H, NoCollision4, OnTop4, climbing_left_active
 NoCollision4:
     ;  Reset floor
     LDA #224
     STA screen_bottom
-NoActiveCollision:
+NoClimbingActive:
     LDA #0
     STA climbing_right_active
     LDA #0
     STA climbing_left_active    
 CollisionChecksDone:
-
 
     ; Initialise controller 1
     LDA #1
@@ -413,28 +425,17 @@ ReadController:
     BEQ NoWallCollision
     ; Stop jump by reseting speed 
     ResetPlayerSpeed
+    ; Call climb macro
     Climb
     JMP ReadRight_Done
 
 NoWallCollision:
-    LDA scroll_x
-    CLC
-    ADC #1
-    STA scroll_x
-    STA PPUSCROLL
-    BCC Scroll_NoWrap
-    ; scroll_x has wrapped, so switch scroll_page
-    LDA scroll_page
-    EOR #1
-    STA scroll_page
-    ORA #%10000000
-    STA PPUCTRL
+    ; Call scroll background macro
+    ScrollBackground #1, Scroll_NoWrap
 Scroll_NoWrap:
     LDA #0
     STA PPUSCROLL
     JMP ReadRight_Done
-    
-
 
 ReadRight_Done:
 
@@ -442,10 +443,6 @@ ReadRight_Done:
     LDA joypad1_state
     AND #BUTTON_DOWN
     BEQ ReadDown_Done ; if ((JOY1 & 1)) != 0 {
-    LDA sprite_player + SPRITE_Y
-    CLC 
-    ADC #1
-    STA sprite_player + SPRITE_Y
                 ; }
 ReadDown_Done:
 
@@ -459,22 +456,13 @@ ReadDown_Done:
     BEQ NoWallCollision2
     ; Stop jump by reseting speed 
     ResetPlayerSpeed
+    ; Call climb macro
     Climb
     JMP ReadLeft_Done
 
 NoWallCollision2:
-    LDA scroll_x
-    SEC
-    SBC #1
-    STA scroll_x
-    STA PPUSCROLL
-    BCC Scroll_NoWrap2
-    ; scroll_x has wrapped, so switch scroll_page
-    LDA scroll_page
-    EOR #1
-    STA scroll_page
-    ORA #%10000000
-    STA PPUCTRL
+    ; Call scroll background macro
+    ScrollBackground #0, Scroll_NoWrap2
 Scroll_NoWrap2:
     LDA #0
     STA PPUSCROLL
