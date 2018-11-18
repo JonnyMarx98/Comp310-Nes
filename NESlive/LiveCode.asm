@@ -415,12 +415,10 @@ ReadController:
     CPX #8
     BNE ReadController
 
-
     ; React to Right button
     LDA joypad1_state
     AND #BUTTON_RIGHT
-    BEQ ReadRight_Done
-    ; TODO make this a macro
+    BEQ ReadRight_Done ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
     LDA climbing_right_active
     BEQ NoWallCollision
     ; Stop jump by reseting speed 
@@ -428,29 +426,32 @@ ReadController:
     ; Call climb macro
     Climb
     JMP ReadRight_Done
-
 NoWallCollision:
     ; Call scroll background macro
     ScrollBackground #1, Scroll_NoWrap
 Scroll_NoWrap:
     LDA #0
     STA PPUSCROLL
+    ; Check if player is on a left wall
+    LDA climbing_left_active   
+    BNE WallJumpRight           ; If player is on a left wall, branch to WallJumpRight
     JMP ReadRight_Done
-
+WallJumpRight:
+    LDA #LOW(JUMP_SPEED)
+    STA player_speed
+    LDA #HIGH(JUMP_SPEED)
+    STA player_speed+1
 ReadRight_Done:
-
      ; Read Down button
     LDA joypad1_state
     AND #BUTTON_DOWN
-    BEQ ReadDown_Done ; if ((JOY1 & 1)) != 0 {
-                ; }
-ReadDown_Done:
+    BEQ ReadDown_Done ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
 
+ReadDown_Done:
     ; React to Left button
     LDA joypad1_state
     AND #BUTTON_LEFT
-    BEQ ReadLeft_Done ; if ((JOY1 & 1)) != 0 {
-
+    BEQ ReadLeft_Done ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button 
     ; If Colliding 
     LDA climbing_left_active
     BEQ NoWallCollision2
@@ -466,13 +467,22 @@ NoWallCollision2:
 Scroll_NoWrap2:
     LDA #0
     STA PPUSCROLL
+    ; Check if player is on right wall
+    LDA climbing_right_active   
+    BNE WallJumpLeft           ; If player is on a right wall, branch to WallJumpLeft
+    JMP ReadLeft_Done
+WallJumpLeft:
+    LDA #LOW(JUMP_SPEED)
+    STA player_speed
+    LDA #HIGH(JUMP_SPEED)
+    STA player_speed+1
     
 ReadLeft_Done:
 
      ; Read Up button
     LDA joypad1_state
     AND #BUTTON_UP
-    BEQ ReadUp_Done
+    BEQ ReadUp_Done ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
 
     ; Check if player is on ground
     LDA screen_bottom ;#SCREEN_BOTTOM_Y - 2    ; Load ScreenBottom into accumulator
@@ -486,13 +496,14 @@ ReadLeft_Done:
     STA player_speed
     LDA #HIGH(JUMP_SPEED)
     STA player_speed+1
+
 ReadUp_Done:
 
 ; React to A button
 
     LDA joypad1_state
     AND #BUTTON_A
-    BEQ ReadA_Done ; if ((JOY1 & 1)) != 0 {
+    BEQ ReadA_Done ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
     ; Spawn a bullet
     LDA bullet_active
     BNE ReadA_Done    ; check if bullet is active (checks if bullet_active is not equal to 0)
@@ -516,7 +527,7 @@ ReadA_Done:
 
     LDA joypad1_state
     AND #BUTTON_B
-    BEQ ReadB_Done ; if ((JOY1 & 1)) != 0 {
+    BEQ ReadB_Done ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
     ; Spawn a bullet
     LDA bullet_active
     BNE ReadB_Done    ; check if bullet is active (checks if bullet_active is not equal to 0)
