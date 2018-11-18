@@ -26,11 +26,6 @@ BUTTON_DOWN   = %00000100
 BUTTON_LEFT   = %00000010
 BUTTON_RIGHT  = %00000001
 
-WALL_HITBOX_WIDTH   = 32
-WALL_HITBOX_HEIGHT  = 16
-WALL_HITBOX_X      = 3 ; Relative to sprite top left corner
-WALL_HITBOX_Y      = 1
-
     .rsset $0010
 joypad1_state            .rs 1
 nametable_address        .rs 2
@@ -48,6 +43,7 @@ player_position_sub      .rs 1 ; in subpixels
 sprite_player      .rs 4
 sprite_bullet      .rs 4
 sprite_wall        .rs 4
+sprite_pyramid     .rs 4
 
     .rsset $0000
 SPRITE_Y           .rs 1
@@ -58,6 +54,18 @@ SPRITE_X           .rs 1
 GRAVITY             = 15        ; in subpixels/frame^2
 JUMP_SPEED          = -2 * 256  ; in subpixels/frame
 SCREEN_BOTTOM       = 224
+
+PLAYER_HEIGHT       = 8
+
+WALL1_X       = (scroll_x+5)
+WALL1_Y       = 64
+WALL1_W       = 64
+WALL1_H       = 64
+
+WALL2_X       = (scroll_x-107)
+WALL2_Y       = 64
+WALL2_W       = 32
+WALL2_H       = 96
 
     .bank 0
     .org $C000
@@ -178,15 +186,15 @@ InitialiseGame: ; Begin subroutine
     STA PPUADDR
 
     ; Write the background colour
-    LDA #$37
+    LDA #$21
     STA PPUDATA
 
     ; Write the palette colours
-    LDA #$06
-    STA PPUDATA
     LDA #$30
     STA PPUDATA
-    LDA #$18
+    LDA #$2D
+    STA PPUDATA
+    LDA #$05
     STA PPUDATA
 
     ; Write sprite data for sprite 0
@@ -198,6 +206,15 @@ InitialiseGame: ; Begin subroutine
     STA sprite_player + SPRITE_ATTRIB
     LDA #128    ; X pos
     STA sprite_player + SPRITE_X
+
+    LDA #50    ; Y pos
+    STA sprite_pyramid + SPRITE_Y
+    LDA #5      ; Tile No.
+    STA sprite_pyramid + SPRITE_TILE
+    LDA #5   ; Attributes (different palettes?)
+    STA sprite_pyramid + SPRITE_ATTRIB
+    LDA #158    ; X pos
+    STA sprite_pyramid + SPRITE_X
 
     ; Load nametable data 
     LDA #$20        ; Write address $2000 to PPUADDR register
@@ -301,21 +318,37 @@ SetCollisionActive .macro ; params: collision_active (left or right), wall_h
     .endm
 
 SetBottom .macro    ; params: wall_h
-    LDA #(SCREEN_BOTTOM + 8 - \1)
+    LDA #(SCREEN_BOTTOM + 8 - \1)       ; Load in SCREEN BOTTOM + PLAYER HEIGHT - WALL HEIGHT 
     STA screen_bottom
     JMP NoActiveCollision
+    .endm
+
+Climb .macro
+    LDA sprite_player + SPRITE_Y
+    SEC 
+    SBC #1
+    STA sprite_player + SPRITE_Y
+    LDA #0
+    STA player_speed
+    .endm
+
+ResetPlayerSpeed .macro 
+    LDA #0
+    STA player_speed
+    LDA #0
+    STA player_speed+1
     .endm
 
     ; RIGHT COLLISIONS
     ; parameters: scroll_x, player_y, wall_x, wall_y, wall_w, wall_h, no_collision_label
     ; Subtract 1 from wall_w so you can move off the wall
-    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x+6), #64, #63, #64, NoCollision1, OnTop1
+    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #WALL1_X, #WALL1_Y, #WALL1_W/2, #WALL1_H, NoCollision1, OnTop1
     SetCollisionActive climbing_right_active
     JMP CollisionChecksDone
 OnTop1:
     SetBottom #64
 NoCollision1:
-    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x-106), #64, #31, #96, NoCollision2, OnTop2
+    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #WALL2_X, #WALL2_Y, #WALL2_W/2, #WALL2_H, NoCollision2, OnTop2
     SetCollisionActive climbing_right_active
     JMP CollisionChecksDone
 OnTop2:
@@ -324,13 +357,13 @@ NoCollision2:
     ; LEFT COLLISIONS
     ; Add 1 to wall_x so you can move off the wall
     ; Subtract 1 from wall_w to compensate 
-    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x+7), #64, #63, #64, NoCollision3, OnTop3
+    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #WALL1_X, #WALL1_Y, #WALL1_W, #WALL1_H, NoCollision3, OnTop3
     SetCollisionActive climbing_left_active
     JMP CollisionChecksDone
 OnTop3:
     SetBottom #64
 NoCollision3:
-    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #(scroll_x-105), #64, #31, #96, NoCollision4, OnTop4
+    CheckCollisionWithWall scroll_x, sprite_player+SPRITE_Y, #WALL2_X, #WALL2_Y, #WALL2_W, #WALL2_H, NoCollision4, OnTop4
     SetCollisionActive climbing_left_active
     JMP CollisionChecksDone
 OnTop4:
@@ -378,18 +411,12 @@ ReadController:
     ; TODO make this a macro
     LDA climbing_right_active
     BEQ NoWallCollision
-    ; Handle Collision
-    LDA sprite_player + SPRITE_Y
-    SEC 
-    SBC #1
-    STA sprite_player + SPRITE_Y
-    LDA #0
-    STA player_speed
+    ; Stop jump by reseting speed 
+    ResetPlayerSpeed
+    Climb
     JMP ReadRight_Done
 
 NoWallCollision:
-    LDA #0
-    STA climbing_right_active
     LDA scroll_x
     CLC
     ADC #1
@@ -430,17 +457,12 @@ ReadDown_Done:
     ; If Colliding 
     LDA climbing_left_active
     BEQ NoWallCollision2
-    LDA sprite_player + SPRITE_Y
-    SEC 
-    SBC #1
-    STA sprite_player + SPRITE_Y
-    LDA #0
-    STA player_speed
+    ; Stop jump by reseting speed 
+    ResetPlayerSpeed
+    Climb
     JMP ReadLeft_Done
 
 NoWallCollision2:
-    LDA #0
-    STA climbing_left_active
     LDA scroll_x
     SEC
     SBC #1
@@ -599,10 +621,10 @@ NametableData:
     .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
     .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
     .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03  
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
+    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$40,$41,$42,$43,$03,$03,$03 
+    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$50,$51,$52,$53,$03,$03,$03 
+    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$60,$61,$62,$63,$03,$03,$03  
+    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$70,$71,$72,$73,$03,$03,$03 
     .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
     .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
     .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
@@ -619,13 +641,13 @@ NametableData:
     .db $03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
     .db $03,$03,$03,$03,$03,$03,$20,$21,$22,$23,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03  
     .db $03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$10,$11,$12,$13,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$20,$21,$22,$23,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$20,$21,$22,$23,$20,$21,$22,$23,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$10,$11,$12,$13,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$20,$21,$22,$23,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$20,$21,$22,$23,$20,$21,$22,$23,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$10,$11,$12,$13,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$20,$21,$22,$23,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$20,$21,$22,$23,$20,$21,$22,$23,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$10,$11,$12,$13,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$20,$21,$22,$23,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$20,$21,$22,$23,$20,$21,$22,$23,$03,$03,$03,$03
+    .db $2C,$2D,$2E,$2F,$03,$03,$20,$21,$22,$23,$03,$29,$2A,$2B,$2C,$2D,$2E,$2F,$03,$03,$20,$21,$22,$23,$20,$21,$22,$23,$03,$29,$2A,$2B 
+    .db $3C,$3D,$3E,$3F,$03,$03,$10,$11,$12,$13,$03,$39,$3A,$3B,$3C,$3D,$3E,$3F,$03,$03,$10,$11,$12,$13,$10,$11,$12,$13,$03,$39,$3A,$3B
+    .db $08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$08,$08,$08,$08,$08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$20,$21,$22,$23,$08,$08,$08,$08 
+    .db $08,$08,$08,$08,$08,$08,$10,$11,$12,$13,$08,$08,$08,$08,$08,$08,$08,$08,$08,$08,$10,$11,$12,$13,$10,$11,$12,$13,$08,$08,$08,$08 
+    .db $08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$08,$08,$08,$08,$08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$20,$21,$22,$23,$08,$08,$08,$08 
+    .db $08,$08,$08,$08,$08,$08,$10,$11,$12,$13,$08,$08,$08,$08,$08,$08,$08,$08,$08,$08,$10,$11,$12,$13,$10,$11,$12,$13,$08,$08,$08,$08 
+    .db $08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$08,$08,$08,$08,$08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$20,$21,$22,$23,$08,$08,$08,$08
     .db $00 ; null terminator
 
 ; ---------------------------------------------------------------------------
