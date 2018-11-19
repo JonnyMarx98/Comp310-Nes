@@ -43,7 +43,7 @@ player_position_sub      .rs 1 ; in subpixels
 sprite_player      .rs 4
 sprite_bullet      .rs 4
 sprite_wall        .rs 4
-sprite_pyramid     .rs 4
+sprite_enemy       .rs 4
 
     .rsset $0000
 SPRITE_Y           .rs 1
@@ -51,8 +51,8 @@ SPRITE_TILE        .rs 1
 SPRITE_ATTRIB      .rs 1
 SPRITE_X           .rs 1
 
-GRAVITY             = 15        ; in subpixels/frame^2
-JUMP_SPEED          = -2 * 256  ; in subpixels/frame
+GRAVITY             = 16        ; in subpixels/frame^2
+JUMP_SPEED          = -2 * 256 - 64; in subpixels/frame
 SCREEN_BOTTOM       = 224
 
 PLAYER_HEIGHT       = 8
@@ -190,12 +190,20 @@ InitialiseGame: ; Begin subroutine
     LDA #$21
     STA PPUDATA
 
-    ; Write the palette colours
+    ; Write the palette 0 colours (player)
     LDA #$30
     STA PPUDATA
     LDA #$2D
     STA PPUDATA
-    LDA #$05
+    LDA #$16
+    STA PPUDATA
+
+    ; Write the palette 1 colours (enemy)
+    LDA #$2D
+    STA PPUDATA
+    LDA #$1D
+    STA PPUDATA
+    LDA #$11
     STA PPUDATA
 
     ; Write sprite data for sprite 0
@@ -208,14 +216,16 @@ InitialiseGame: ; Begin subroutine
     LDA #128    ; X pos
     STA sprite_player + SPRITE_X
 
-    LDA #50    ; Y pos
-    STA sprite_pyramid + SPRITE_Y
-    LDA #5      ; Tile No.
-    STA sprite_pyramid + SPRITE_TILE
-    LDA #5   ; Attributes (different palettes?)
-    STA sprite_pyramid + SPRITE_ATTRIB
-    LDA #158    ; X pos
-    STA sprite_pyramid + SPRITE_X
+    ; Write sprite data for sprite 0
+    LDA #135    ; Y pos
+    STA sprite_enemy + SPRITE_Y
+    LDA #$05      ; Tile No.
+    STA sprite_enemy + SPRITE_TILE
+    LDA #1   ; Attributes (different palettes?)
+    STA sprite_enemy + SPRITE_ATTRIB
+    LDA #60    ; X pos
+    STA sprite_enemy + SPRITE_X
+
 
     ; Load nametable data 
     LDA #$20        ; Write address $2000 to PPUADDR register
@@ -360,6 +370,16 @@ ScrollBackground .macro  ; params: Left(0) or Right(1), no_scroll_label
     .endif
     STA scroll_x
     STA PPUSCROLL
+    LDA sprite_enemy+SPRITE_X
+    .if \1 < 1                                      ; If direction is 0 scroll left, else scroll right 
+    CLC
+    ADC #1
+    .else
+    LDA sprite_enemy+SPRITE_X
+    SEC
+    SBC #1
+    .endif
+    STA sprite_enemy+SPRITE_X
     BCC \2
     ; scroll_x has wrapped, so switch scroll_page
     LDA scroll_page
@@ -367,6 +387,7 @@ ScrollBackground .macro  ; params: Left(0) or Right(1), no_scroll_label
     STA scroll_page
     ORA #%10000000
     STA PPUCTRL
+    
     .endm
 
 CollisionCheck .macro
@@ -537,7 +558,7 @@ ReadA_Done:
     STA sprite_bullet + SPRITE_Y
     LDA #2      ; Tile No.
     STA sprite_bullet + SPRITE_TILE
-    LDA #0      ; Attributes (different palettes?)
+    LDA #0      ; Attributes 
     STA sprite_bullet + SPRITE_ATTRIB
     LDA sprite_player + SPRITE_X   ; X pos
     STA sprite_bullet + SPRITE_X
@@ -638,8 +659,8 @@ NametableData:
     .db $03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
     .db $03,$03,$03,$03,$03,$03,$20,$21,$22,$23,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03  
     .db $03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$10,$11,$12,$13,$03,$03,$03,$03 
-    .db $2C,$2D,$2E,$2F,$03,$03,$20,$21,$22,$23,$03,$29,$2A,$2B,$2C,$2D,$2E,$2F,$03,$03,$20,$21,$22,$23,$20,$21,$22,$23,$03,$29,$2A,$2B 
-    .db $3C,$3D,$3E,$3F,$03,$03,$10,$11,$12,$13,$03,$39,$3A,$3B,$3C,$3D,$3E,$3F,$03,$03,$10,$11,$12,$13,$10,$11,$12,$13,$03,$39,$3A,$3B
+    .db $0B,$03,$03,$03,$03,$03,$20,$21,$22,$23,$03,$29,$2A,$2B,$2C,$2D,$2E,$2F,$03,$03,$20,$21,$22,$23,$20,$21,$22,$23,$03,$03,$09,$0A 
+    .db $1B,$1C,$1D,$03,$03,$03,$10,$11,$12,$13,$03,$39,$3A,$3B,$3C,$3D,$3E,$3F,$03,$03,$10,$11,$12,$13,$10,$11,$12,$13,$03,$03,$19,$1A
     .db $08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$08,$08,$08,$08,$08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$20,$21,$22,$23,$08,$08,$08,$08 
     .db $08,$08,$08,$08,$08,$08,$10,$11,$12,$13,$08,$08,$08,$08,$08,$08,$08,$08,$08,$08,$10,$11,$12,$13,$10,$11,$12,$13,$08,$08,$08,$08 
     .db $08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$08,$08,$08,$08,$08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$20,$21,$22,$23,$08,$08,$08,$08 
