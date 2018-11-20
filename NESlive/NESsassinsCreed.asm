@@ -26,6 +26,8 @@ BUTTON_DOWN   = %00000100
 BUTTON_LEFT   = %00000010
 BUTTON_RIGHT  = %00000001
 
+NUM_ENEMIES   = 5
+
     .rsset $0010
 joypad1_state            .rs 1
 nametable_address        .rs 2
@@ -33,17 +35,22 @@ bullet_active            .rs 1
 bullet_direction         .rs 1
 scroll_x                 .rs 1
 screen_bottom            .rs 1
-climbing_right_active   .rs 1
-climbing_left_active    .rs 1
+climbing_right_active    .rs 1
+climbing_left_active     .rs 1
 scroll_page              .rs 1
-player_speed             .rs 2 ; in subpixels/frame -- 16bits
+player_jump_speed        .rs 2 ; in subpixels/frame -- 16bits
 player_position_sub      .rs 1 ; in subpixels
+enemy_info               .rs 4 * NUM_ENEMIES
+enemyY_speed             .rs 2
+enemyY_position_sub      .rs 1 ; in subpixels
+enemyX_speed             .rs 2
+enemyX_position_sub      .rs 1 ; in subpixels
      
     .rsset $0200
 sprite_player      .rs 4
 sprite_bullet      .rs 4
 sprite_wall        .rs 4
-sprite_enemy       .rs 4
+sprite_enemy       .rs 4 * NUM_ENEMIES
 
     .rsset $0000
 SPRITE_Y           .rs 1
@@ -51,6 +58,11 @@ SPRITE_TILE        .rs 1
 SPRITE_ATTRIB      .rs 1
 SPRITE_X           .rs 1
 
+;     .rsset $0000
+; ENEMY_SPEED        .rs 1
+; ENEMY_ALIVE        .rs 1
+
+ENEMY_X_SPEED       = 128     ; in subpixels/frame
 GRAVITY             = 16        ; in subpixels/frame^2
 JUMP_SPEED          = -2 * 256 - 64; in subpixels/frame
 SCREEN_BOTTOM       = 224
@@ -346,17 +358,17 @@ Climb .macro
 
 ResetPlayerSpeed .macro 
     LDA #0                                          ; Load 0 into accumulator
-    STA player_speed                                ; Store into player_speed and player_speed+1
+    STA player_jump_speed                                ; Store into player_jump_speed and player_jump_speed+1
     LDA #0
-    STA player_speed+1
+    STA player_jump_speed+1
     .endm
 
 PlayerJump .macro 
     ; Jump by setting player speed
     LDA #LOW(JUMP_SPEED)
-    STA player_speed
+    STA player_jump_speed
     LDA #HIGH(JUMP_SPEED)
-    STA player_speed+1
+    STA player_jump_speed+1
     .endm
 
 ScrollBackground .macro  ; params: Left(0) or Right(1), no_scroll_label
@@ -596,21 +608,21 @@ ShootRight:
 UpdateBullet_Done:
     ; Update player sprite
     ; First, update speed
-    LDA player_speed    ; Low 8 bits
+    LDA player_jump_speed    ; Low 8 bits
     CLC
     ADC #LOW(GRAVITY)
-    STA player_speed
-    LDA player_speed+1  ; High 8 bits
+    STA player_jump_speed
+    LDA player_jump_speed+1  ; High 8 bits
     ADC #HIGH(GRAVITY)  ; NB: *don't* clear the carry flag!
-    STA player_speed+1
+    STA player_jump_speed+1
 
     ; Second, update position
     LDA player_position_sub    ; Low 8 bits
     CLC
-    ADC player_speed
+    ADC player_jump_speed
     STA player_position_sub
     LDA sprite_player+SPRITE_Y ; High 8 bits
-    ADC player_speed+1         ; NB: *don't* clear the carry flag!
+    ADC player_jump_speed+1         ; NB: *don't* clear the carry flag!
     STA sprite_player+SPRITE_Y
 
     ; Check for the bottom of screen
@@ -621,9 +633,65 @@ UpdateBullet_Done:
     SBC #1
     STA sprite_player+SPRITE_Y
     LDA #0                  ; Set player speed to zero
-    STA player_speed        ; (both bytes)
-    STA player_speed+1
+    STA player_jump_speed        ; (both bytes)
+    STA player_jump_speed+1
 UpdatePlayer_NoClamp:
+
+; Update enemies
+    LDA sprite_player+SPRITE_X
+    CMP sprite_enemy+SPRITE_X   ; if playerX >= enemyX set carry flag, else clear carry flag
+    BCC MoveEnemyLeft
+MoveEnemyRight:
+    ; Second, update position
+    LDA enemyX_position_sub    ; Low 8 bits
+    CLC
+    ADC #LOW(ENEMY_X_SPEED)*-1
+    STA enemyX_position_sub
+    LDA sprite_enemy+SPRITE_X ; High 8 bits
+    ADC #HIGH(ENEMY_X_SPEED)*-1         ; NB: *don't* clear the carry flag!
+    STA sprite_enemy+SPRITE_X
+    JMP EnemyX_Updated
+MoveEnemyLeft:
+    ; Second, update position
+    LDA enemyX_position_sub    ; Low 8 bits
+    SEC
+    SBC #LOW(ENEMY_X_SPEED)
+    STA enemyX_position_sub
+    LDA sprite_enemy+SPRITE_X ; High 8 bits
+    SBC #HIGH(ENEMY_X_SPEED)         ; NB: *don't* clear the carry flag!
+    STA sprite_enemy+SPRITE_X
+EnemyX_Updated:
+    ; First, update speed
+    LDA enemyY_speed    ; Low 8 bits
+    CLC
+    ADC #LOW(GRAVITY)
+    STA enemyY_speed
+    LDA enemyY_speed+1  ; High 8 bits
+    ADC #HIGH(GRAVITY)  ; NB: *don't* clear the carry flag!
+    STA enemyY_speed+1
+
+    ; Second, update position
+    LDA enemyY_position_sub    ; Low 8 bits
+    CLC
+    ADC enemyY_speed
+    STA enemyY_position_sub
+    LDA sprite_enemy+SPRITE_Y ; High 8 bits
+    ADC enemyY_speed+1         ; NB: *don't* clear the carry flag!
+    STA sprite_enemy+SPRITE_Y
+
+    ; Check for the bottom of screen
+    CMP screen_bottom ;#SCREEN_BOTTOM_Y    ; Accumulator
+    BCC UpdateEnemy_NoClamp
+    LDA screen_bottom;#SCREEN_BOTTOM_Y-1
+    SEC
+    SBC #1
+    STA sprite_enemy+SPRITE_Y
+    LDA #0                  ; Set player speed to zero
+    STA enemyY_speed        ; (both bytes)
+    STA enemyY_speed+1
+UpdateEnemy_NoClamp:
+
+
 
     ; copy sprite data to ppu
     LDA #0
