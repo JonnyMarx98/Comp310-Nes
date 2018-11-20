@@ -378,28 +378,35 @@ PlayerJump .macro
     STA player_jump_speed+1
     .endm
 
-ScrollBackground .macro  ; params: Left(0) or Right(1), no_scroll_label
+ScrollBackground .macro  ; params: Left(0) or Right(1), scroll speed,  no_scroll_label, reset (0)
+    .if \4 > 0                                      ; If not resetting scroll_x
     LDA scroll_x
     .if \1 < 1                                      ; If direction is 0 scroll left, else scroll right 
     SEC
-    SBC #1
+    SBC \2
     .else
     CLC 
-    ADC #1
+    ADC \2
     .endif
     STA scroll_x
     STA PPUSCROLL
+    .else
+    LDA #0
+    STA scroll_x
+    STA PPUSCROLL
+    .endif
+
     LDA sprite_enemy+SPRITE_X
     .if \1 < 1                                      ; If direction is 0 scroll left, else scroll right 
     CLC
-    ADC #1
+    ADC \2
     .else
     LDA sprite_enemy+SPRITE_X
     SEC
-    SBC #1
+    SBC \2
     .endif
     STA sprite_enemy+SPRITE_X
-    BCC \2
+    BCC \3
     ; scroll_x has wrapped, so switch scroll_page
     LDA scroll_page
     EOR #1
@@ -475,7 +482,7 @@ ReadController:
     JMP ReadRight_Done
 NoWallCollision:
     ; Call scroll background macro
-    ScrollBackground #1, Scroll_NoWrap
+    ScrollBackground #1, #1, Scroll_NoWrap, #1
 Scroll_NoWrap:
     LDA #0
     STA PPUSCROLL
@@ -507,7 +514,7 @@ ReadDown_Done:
 
 NoWallCollision2:
     ; Call scroll background macro
-    ScrollBackground #0, Scroll_NoWrap2
+    ScrollBackground #0, #1, Scroll_NoWrap2, #1
 Scroll_NoWrap2:
     LDA #0
     STA PPUSCROLL
@@ -748,10 +755,25 @@ CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, o
     STA enemy_info+ENEMY_ALIVE    ; Destroy the enemy
     LDA #$FF
     STA sprite_bullet+SPRITE_X
-    STA sprite_enemy+SPRITE_Y
+    LDA sprite_enemy+SPRITE_X
+    CLC
+    ADC #100
+    STA sprite_enemy+SPRITE_X
 UpdateEnemies_NoCollision:
+    ; Check collision with bullet
+    CheckCollisionWithEnemy sprite_player+SPRITE_X, sprite_player+SPRITE_Y, #0, #0, #8, #8, UpdateEnemies_NoCollisionWithPlayer
+    ; Handle collision
+    LDA sprite_player+SPRITE_Y
+    CLC
+    ADC #100
+    STA sprite_player+SPRITE_Y
+    ScrollBackground #0, #1, Scroll_NoWrap3, #0
+Scroll_NoWrap3:
+    LDA #0
+    STA PPUSCROLL
+UpdateEnemies_NoCollisionWithPlayer:
 
-
+UpdateEnemies_End:
 
     ; copy sprite data to ppu
     LDA #0
