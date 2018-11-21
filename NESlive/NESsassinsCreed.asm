@@ -27,8 +27,8 @@ BUTTON_LEFT   = %00000010
 BUTTON_RIGHT  = %00000001
 
 NUM_ENEMIES   = 5
-ENEMY_HITBOX_WIDTH   = 8
-ENEMY_HITBOX_HEIGHT  = 8
+ENEMY_HITBOX_WIDTH   = 4
+ENEMY_HITBOX_HEIGHT  = 4
 BULLET_HITBOX_X      = 3 ; Relative to sprite top left corner
 BULLET_HITBOX_Y      = 1
 BULLET_HITBOX_WIDTH  = 2
@@ -51,6 +51,7 @@ enemyY_speed             .rs 2
 enemyY_position_sub      .rs 1 ; in subpixels
 enemyX_speed             .rs 2
 enemyX_position_sub      .rs 1 ; in subpixels
+Assassinate              .rs 1 ; Is player assassinating bool
      
     .rsset $0200
 sprite_player      .rs 4
@@ -70,10 +71,14 @@ SPRITE_GROUND      .rs 1
 ENEMY_ALIVE        .rs 1
 
 ENEMY_X_SPEED       = 128     ; in subpixels/frame
+ENEMY_Y_VISION      = 50
 GRAVITY             = 16        ; in subpixels/frame^2
+ASSASSIN_FALL_SPEED = 64
+ASSINATE_RANGE      = 30
 JUMP_SPEED          = -2 * 256 - 64; in subpixels/frame
 SCREEN_BOTTOM       = 224
 
+PLAYER_WIDTH        = 4
 PLAYER_HEIGHT       = 8
 PLAYER_X_OFFSET     = 6
 
@@ -421,6 +426,8 @@ CollisionCheck .macro
     SetCollisionActive \8
     JMP CollisionChecksDone
 \7:
+    LDA #0
+    STA Assassinate     ; Stop assinate when on top of a wall 
     SetBottom \5
     .endm 
 
@@ -498,6 +505,28 @@ ReadRight_Done:
     AND #BUTTON_DOWN
     BEQ ReadDown_Done ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
 
+    LDA Assassinate
+    BNE NoAssassinate
+    LDA sprite_player+SPRITE_X
+    CLC
+    ADC #ASSINATE_RANGE
+    CMP sprite_enemy+SPRITE_X       ; if playerX + 10 >= enemyX set carry flag
+    BCC NoAssassinate
+    SEC
+    SBC #ENEMY_HITBOX_WIDTH + ASSINATE_RANGE*2 
+    CMP sprite_enemy+SPRITE_X       ; if playerX - enemyW - 10 >= enemyX set carry flag
+    BCS NoAssassinate
+    LDA sprite_enemy+SPRITE_Y
+    CMP sprite_player+SPRITE_X      ; if enemyY >= playerY set carry flag
+    BCC NoAssassinate
+    ; Set Assassinate to true (1)
+    LDA #1
+    STA Assassinate
+    LDA #0                  ; Set player speed to zero
+    STA player_jump_speed        ; (both bytes)
+    STA player_jump_speed+1
+NoAssassinate:
+
 ReadDown_Done:
     ; React to Left button
     LDA joypad1_state
@@ -533,7 +562,7 @@ ReadLeft_Done:
     BEQ ReadUp_Done ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
 
     ; Check if player is on ground
-    LDA sprite_player+SPRITE_GROUND;screen_bottom ;#SCREEN_BOTTOM_Y - 2    ; Load ScreenBottom into accumulator
+    LDA sprite_player+SPRITE_GROUND;screen_bottom ; - 2    ; Load ScreenBottom into accumulator
     SEC
     SBC #2
     CLC                         ; clear carry flag
@@ -619,6 +648,32 @@ ShootRight:
     STA bullet_active
 
 UpdateBullet_Done:
+
+    LDA Assassinate
+    BEQ NotAssassinating
+    ; Update speed
+    LDA player_jump_speed    ; Low 8 bits
+    CLC
+    ADC #LOW(ASSASSIN_FALL_SPEED)
+    STA player_jump_speed
+    LDA player_jump_speed+1  ; High 8 bits
+    ADC #HIGH(ASSASSIN_FALL_SPEED)  ; NB: *don't* clear the carry flag!
+    STA player_jump_speed+1
+    LDA sprite_player+SPRITE_X
+    CMP sprite_enemy+SPRITE_X    ; if playerX >= enemyX set carry flag
+    BCS AssassinateLeft
+    ScrollBackground #1, #2, Scroll_NoWrap4, #1
+Scroll_NoWrap4:
+    LDA #0
+    STA PPUSCROLL
+    JMP UpdatePlayerPosition
+AssassinateLeft:
+    ScrollBackground #0, #2, Scroll_NoWrap5, #1
+Scroll_NoWrap5:
+    LDA #0
+    STA PPUSCROLL    
+    JMP UpdatePlayerPosition
+NotAssassinating:
     ; Update player sprite
     ; First, update speed
     LDA player_jump_speed    ; Low 8 bits
@@ -628,7 +683,7 @@ UpdateBullet_Done:
     LDA player_jump_speed+1  ; High 8 bits
     ADC #HIGH(GRAVITY)  ; NB: *don't* clear the carry flag!
     STA player_jump_speed+1
-
+UpdatePlayerPosition:
     ; Second, update position
     LDA player_position_sub    ; Low 8 bits
     CLC
@@ -639,9 +694,9 @@ UpdateBullet_Done:
     STA sprite_player+SPRITE_Y
 
     ; Check for the bottom of screen
-    CMP sprite_player+SPRITE_GROUND;screen_bottom ;#SCREEN_BOTTOM_Y    ; Accumulator
+    CMP sprite_player+SPRITE_GROUND;screen_bottom ;   ; Accumulator
     BCC UpdatePlayer_NoClamp
-    LDA sprite_player+SPRITE_GROUND;screen_bottom;#SCREEN_BOTTOM_Y-1
+    LDA sprite_player+SPRITE_GROUND;screen_bottom;
     SEC
     SBC #1
     STA sprite_player+SPRITE_Y
@@ -652,12 +707,12 @@ UpdatePlayer_NoClamp:
 
 ; Update enemies
 
-    ; Collision
+    ; Check if enemy can see player
     LDA sprite_player+SPRITE_Y
-    CMP sprite_enemy+SPRITE_Y                 ; if enemyX >= WALL1_X then set carry
-    BCS OhNoNo
+    CMP #SCREEN_BOTTOM - ENEMY_Y_VISION   ; if playerX >= bottom+ enemy Y vision set carry
+    BCS MoveEnemyTowardsPlayer
     JMP EnemyX_Updated
-OhNoNo:
+MoveEnemyTowardsPlayer:
 
     ; Set ground
     LDA #SCREEN_BOTTOM
@@ -704,9 +759,9 @@ EnemyX_Updated:
     STA sprite_enemy+SPRITE_Y
 
     ; Check for the bottom of screen
-    CMP sprite_enemy+SPRITE_GROUND;screen_bottom ;#SCREEN_BOTTOM_Y    ; Accumulator
+    CMP sprite_enemy+SPRITE_GROUND;screen_bottom ;  ; Accumulator
     BCC UpdateEnemy_NoClamp
-    LDA sprite_enemy+SPRITE_GROUND;screen_bottom;#SCREEN_BOTTOM_Y-1
+    LDA sprite_enemy+SPRITE_GROUND;screen_bottom;
     SEC
     SBC #1
     STA sprite_enemy+SPRITE_Y
@@ -718,18 +773,18 @@ UpdateEnemy_NoClamp:
 CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, object_hit_y, object_hit_w, object_hit_h, no_collision_label
     ; if there is a collision, execution continues immediately after this macro
     ; else, jump to no_collision_label
-    LDA sprite_enemy+SPRITE_X  ; Calculate x_enemy - w_bullet (x1-w2)
+    LDA sprite_enemy+SPRITE_X  ; Calculate x_enemy - object_hit_w (x1-w2)
     .if \3 > 0
     SEC
     SBC \3
     .endif
     SEC
     SBC \5+1                      ; Assume w2 = 8
-    CMP \1                        ; Compare with x_bullet (x2)
+    CMP \1                        ; Compare with object_x (x2)
     BCS \7                        ; Branch if x1-w2-1-BULLET_HITBOX_X >= x2  ie x1-w2 > x2
     CLC
     ADC \5+ENEMY_HITBOX_WIDTH+1   ; Calculate x_enemy + w_enemy (x1+w1) assuming w1 = 8
-    CMP \1                        ; Compare with x_bullet (x2)
+    CMP \1                        ; Compare with object_x (x2)
     BCC \7                        ; Branch if x1+w1+1+BULLET_HITBOX_X <= x2
 
     LDA sprite_enemy+SPRITE_Y ; Calculate y_enemy - h_bullet (y1-h2)
@@ -739,12 +794,13 @@ CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, o
     .endif
     SEC
     SBC \6+1                      ; Assume h2 = 8
-    CMP \2                        ; Compare with y_bullet (y2)
+    CMP \2                        ; Compare with object_y (y2)
     BCS \7                        ; Branch if y1-h2-1-BULLET_HITBOX_Y >= y2
     CLC
     ADC \6+ENEMY_HITBOX_WIDTH+1   ; Calculate y_enemy + h_enemy (y1+h1) assuming h1 = 8
-    CMP \2                        ; Compare with y_bullet (y2)
-    BCC \7                        ; Branch if y1+h1+1+BULLET_HITBOX_Y <= y2    
+    CMP \2                        ; Compare with object_y (y2)
+    BCC \7                        ; Branch if y1+h1+1+BULLET_HITBOX_Y <= y2
+
     .endm
 
     ; Check collision with bullet
@@ -761,8 +817,20 @@ CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, o
     STA sprite_enemy+SPRITE_X
 UpdateEnemies_NoCollision:
     ; Check collision with bullet
-    CheckCollisionWithEnemy sprite_player+SPRITE_X, sprite_player+SPRITE_Y, #0, #0, #8, #8, UpdateEnemies_NoCollisionWithPlayer
+    CheckCollisionWithEnemy sprite_player+SPRITE_X, sprite_player+SPRITE_Y, #0, #0, #PLAYER_WIDTH, #PLAYER_HEIGHT, UpdateEnemies_NoCollisionWithPlayer
     ; Handle collision
+    LDA Assassinate
+    BEQ PlayerKilled
+    LDA #0
+    STA enemy_info+ENEMY_ALIVE      ; Destroy the enemy
+    LDA sprite_enemy+SPRITE_X
+    CLC
+    ADC #100
+    STA sprite_enemy+SPRITE_X
+    LDA #0
+    STA Assassinate                 ; Set Assassinate to false (0)
+    JMP UpdateEnemies_NoCollisionWithPlayer
+PlayerKilled:
     LDA sprite_player+SPRITE_Y
     CLC
     ADC #100
