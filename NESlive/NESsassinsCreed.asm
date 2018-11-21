@@ -82,7 +82,7 @@ ASSASSIN_FALL_SPEED = 64
 ASSINATE_RANGE      = 30
 JUMP_SPEED          = -2 * 256 - 64; in subpixels/frame
 SCREEN_BOTTOM       = 224
-HIT_STOP_LENGTH     = 5
+HIT_STOP_LENGTH     = 7
 
 PLAYER_WIDTH        = 4
 PLAYER_HEIGHT       = 8
@@ -454,7 +454,9 @@ ScrollBackground .macro  ; params: Left(0) or Right(1), scroll speed,  no_scroll
     STA scroll_page
     ORA #%10000000
     STA PPUCTRL
-    
+\3:
+    LDA #0
+    STA PPUSCROLL  
     .endm
 
 CollisionCheck .macro
@@ -526,9 +528,6 @@ ReadController:
 NoWallCollision:
     ; Call scroll background macro
     ScrollBackground #1, #1, Scroll_NoWrap, #1
-Scroll_NoWrap:
-    LDA #0
-    STA PPUSCROLL
     ; Check if player is on a left wall
     LDA climbing_left_active   
     BNE WallJumpRight           ; If player is on a left wall, branch to WallJumpRight
@@ -539,30 +538,27 @@ ReadRight_Done:
      ; Read Down button
     LDA joypad1_state
     AND #BUTTON_DOWN
-    BEQ ReadDown_Done ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
-
+    BEQ ReadDown_Done; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
     LDA Assassinate
-    BNE NoAssassinate
+    BNE ReadDown_Done
     LDA sprite_player+SPRITE_X
     CLC
     ADC #ASSINATE_RANGE
     CMP sprite_enemy+SPRITE_X       ; if playerX + 10 >= enemyX set carry flag
-    BCC NoAssassinate
+    BCC ReadDown_Done
     SEC
     SBC #ENEMY_HITBOX_WIDTH + ASSINATE_RANGE*2 
     CMP sprite_enemy+SPRITE_X       ; if playerX - enemyW - 10 >= enemyX set carry flag
-    BCS NoAssassinate
+    BCS ReadDown_Done
     LDA sprite_enemy+SPRITE_Y
     CMP sprite_player+SPRITE_X      ; if enemyY >= playerY set carry flag
-    BCC NoAssassinate
+    BCC ReadDown_Done
     ; Set Assassinate to true (1)
     LDA #1
     STA Assassinate
     LDA #0                  ; Set player speed to zero
     STA player_jump_speed        ; (both bytes)
     STA player_jump_speed+1
-NoAssassinate:
-
 ReadDown_Done:
     ; React to Left button
     LDA joypad1_state
@@ -580,9 +576,6 @@ ReadDown_Done:
 NoWallCollision2:
     ; Call scroll background macro
     ScrollBackground #0, #1, Scroll_NoWrap2, #1
-Scroll_NoWrap2:
-    LDA #0
-    STA PPUSCROLL
     ; Check if player is on right wall
     LDA climbing_right_active   
     BNE WallJumpLeft           ; If player is on a right wall, branch to WallJumpLeft
@@ -685,9 +678,7 @@ ShootRight:
 
 UpdateBullet_Done:
 
-    LDA Assassinate
-    BEQ NotAssassinating
-    ; Update speed
+AssassinateEnemy .macro   ; enemyX 
     LDA player_jump_speed    ; Low 8 bits
     CLC
     ADC #LOW(ASSASSIN_FALL_SPEED)
@@ -696,19 +687,19 @@ UpdateBullet_Done:
     ADC #HIGH(ASSASSIN_FALL_SPEED)  ; NB: *don't* clear the carry flag!
     STA player_jump_speed+1
     LDA sprite_player+SPRITE_X
-    CMP sprite_enemy+SPRITE_X    ; if playerX >= enemyX set carry flag
+    CMP \1    ; if playerX >= enemyX set carry flag
     BCS AssassinateLeft
     ScrollBackground #1, #2, Scroll_NoWrap4, #1
-Scroll_NoWrap4:
-    LDA #0
-    STA PPUSCROLL
     JMP UpdatePlayerPosition
 AssassinateLeft:
     ScrollBackground #0, #2, Scroll_NoWrap5, #1
-Scroll_NoWrap5:
-    LDA #0
-    STA PPUSCROLL    
     JMP UpdatePlayerPosition
+    .endm
+
+    LDA Assassinate
+    BEQ NotAssassinating
+    AssassinateEnemy sprite_enemy+SPRITE_X
+
 NotAssassinating:
     ; Update player sprite
     ; First, update speed
@@ -875,9 +866,6 @@ PlayerKilled:
     ADC #100
     STA sprite_player+SPRITE_Y
     ScrollBackground #0, #1, Scroll_NoWrap3, #0
-Scroll_NoWrap3:
-    LDA #0
-    STA PPUSCROLL
 JumpToNoCollisionLabel:
     JMP UpdateEnemies_NoCollisionWithPlayer
 
