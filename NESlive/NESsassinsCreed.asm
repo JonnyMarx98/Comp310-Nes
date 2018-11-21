@@ -27,12 +27,15 @@ BUTTON_LEFT   = %00000010
 BUTTON_RIGHT  = %00000001
 
 NUM_ENEMIES   = 5
+ENEMY_SQUAD_WIDTH    = 6
+ENEMY_SQUAD_HEIGHT   = 4
 ENEMY_HITBOX_WIDTH   = 4
 ENEMY_HITBOX_HEIGHT  = 4
 BULLET_HITBOX_X      = 3 ; Relative to sprite top left corner
 BULLET_HITBOX_Y      = 1
 BULLET_HITBOX_WIDTH  = 2
 BULLET_HITBOX_HEIGHT = 6
+BULLET_SPEED         = 3
 
     .rsset $0010
 joypad1_state            .rs 1
@@ -252,6 +255,31 @@ InitialiseGame: ; Begin subroutine
     STA sprite_enemy + SPRITE_ATTRIB
     LDA #60    ; X pos
     STA sprite_enemy + SPRITE_X
+
+;     ; Initialise enemies
+;     LDX #0
+;     LDA #ENEMY_SQUAD_WIDTH * ENEMY_SPACING
+;     STA temp_x
+; InitEnemies_LoopX:
+;     ; ACcumluator = temp_x here 
+;     STA sprite_enemy+SPRITE_X, x 
+;     LDA #1
+;     STA sprite_enemy+SPRITE_ATTRIB, x
+;     STA enemy_info+ENEMY_SPEED, x 
+;     STA enemy_info+ENEMY_ALIVE, x
+;     LDA #$05
+;     STA sprite_enemy+SPRITE_TILE, x 
+;     ; Increment X register by 4
+;     TXA
+;     CLC
+;     ADC #4
+;     TAX
+;     ; Loop check for x value
+;     LDA temp_x
+;     SEC
+;     SBC #ENEMY_SPACING
+;     STA temp_x
+;     BNE InitEnemies_LoopX
 
 
     ; Load nametable data 
@@ -638,7 +666,7 @@ ReadB_Done:
     BEQ ShootRight
     LDA sprite_bullet + SPRITE_X
     SEC
-    SBC #4
+    SBC #BULLET_SPEED
     STA sprite_bullet + SPRITE_X
     BCS UpdateBullet_Done
     ; If carry flag is clear, bullet has left the top of the screen -- destroy it
@@ -648,7 +676,7 @@ ReadB_Done:
 ShootRight:
     LDA sprite_bullet + SPRITE_X
     CLC 
-    ADC #4
+    ADC #BULLET_SPEED
     STA sprite_bullet + SPRITE_X    
     BCC UpdateBullet_Done
     ; If carry flag is clear, bullet has left the top of the screen -- destroy it
