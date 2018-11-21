@@ -52,6 +52,8 @@ enemyY_position_sub      .rs 1 ; in subpixels
 enemyX_speed             .rs 2
 enemyX_position_sub      .rs 1 ; in subpixels
 Assassinate              .rs 1 ; Is player assassinating bool
+hit_stop_timer           .rs 1
+hit_stop                 .rs 1 
      
     .rsset $0200
 sprite_player      .rs 4
@@ -77,6 +79,7 @@ ASSASSIN_FALL_SPEED = 64
 ASSINATE_RANGE      = 30
 JUMP_SPEED          = -2 * 256 - 64; in subpixels/frame
 SCREEN_BOTTOM       = 224
+HIT_STOP_LENGTH     = 5
 
 PLAYER_WIDTH        = 4
 PLAYER_HEIGHT       = 8
@@ -328,6 +331,11 @@ LoadAttributes2_Loop:
 
 ; NMI is called on every frame
 NMI:
+
+    LDA hit_stop
+    BEQ NoHit_Stop
+    JMP UpdateHit_Stop
+NoHit_Stop:
 
                                    ;            \1       \2       \3      \4        \5            \6             \7   
 CheckCollisionWithWall .macro ; parameters: scroll_x, player_y, wall_x, wall_w, wall_h, no_collision_label, on_top_label
@@ -817,19 +825,22 @@ CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, o
     STA sprite_enemy+SPRITE_X
 UpdateEnemies_NoCollision:
     ; Check collision with bullet
-    CheckCollisionWithEnemy sprite_player+SPRITE_X, sprite_player+SPRITE_Y, #0, #0, #PLAYER_WIDTH, #PLAYER_HEIGHT, UpdateEnemies_NoCollisionWithPlayer
+    CheckCollisionWithEnemy sprite_player+SPRITE_X, sprite_player+SPRITE_Y, #0, #0, #PLAYER_WIDTH, #PLAYER_HEIGHT, JumpToNoCollisionLabel
     ; Handle collision
     LDA Assassinate
     BEQ PlayerKilled
-    LDA #0
-    STA enemy_info+ENEMY_ALIVE      ; Destroy the enemy
-    LDA sprite_enemy+SPRITE_X
-    CLC
-    ADC #100
-    STA sprite_enemy+SPRITE_X
-    LDA #0
-    STA Assassinate                 ; Set Assassinate to false (0)
-    JMP UpdateEnemies_NoCollisionWithPlayer
+    ; LDA #0
+    ; STA enemy_info+ENEMY_ALIVE      ; Destroy the enemy
+    ; LDA sprite_enemy+SPRITE_X
+    ; CLC
+    ; ADC #100
+    ; STA sprite_enemy+SPRITE_X
+                   ; Set Assassinate to false (0)
+    LDA #HIT_STOP_LENGTH
+    STA hit_stop_timer
+    LDA #1
+    STA hit_stop        ; Set hit stop to true
+    JMP UpdateHit_Stop
 PlayerKilled:
     LDA sprite_player+SPRITE_Y
     CLC
@@ -839,9 +850,31 @@ PlayerKilled:
 Scroll_NoWrap3:
     LDA #0
     STA PPUSCROLL
-UpdateEnemies_NoCollisionWithPlayer:
+JumpToNoCollisionLabel:
+    JMP UpdateEnemies_NoCollisionWithPlayer
 
+    ; Hit stop to provide better feeling of impact on assassination
+UpdateHit_Stop:
+    LDA hit_stop_timer
+    BEQ HitStop_Complete
+    SEC
+    SBC #1
+    STA hit_stop_timer
+    JMP UpdateEnemies_End
+HitStop_Complete:
+    ; Kill enemy and respawn
+    LDA #0
+    STA enemy_info+ENEMY_ALIVE ; Destroy the enemy
+    STA Assassinate            ; Stop assassinating
+    STA hit_stop               ; Stop hit stop       
+    LDA sprite_enemy+SPRITE_X
+    CLC
+    ADC #100
+    STA sprite_enemy+SPRITE_X    
+UpdateEnemies_NoCollisionWithPlayer:
+    
 UpdateEnemies_End:
+    
 
     ; copy sprite data to ppu
     LDA #0
