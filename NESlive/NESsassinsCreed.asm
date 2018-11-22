@@ -391,7 +391,7 @@ SetCollisionActive .macro ; params: collision_active (left or right)
 
 SetBottom .macro    ; params: wall_h
     LDA #(SCREEN_BOTTOM + PLAYER_HEIGHT - \1)       ; Load in SCREEN BOTTOM + PLAYER HEIGHT - WALL HEIGHT 
-    STA sprite_player+SPRITE_GROUND; screen_bottom
+    STA screen_bottom
     JMP NoClimbingActive
     .endm
 
@@ -483,7 +483,7 @@ NoCollision3:
 NoCollision4:
     ;  Reset floor
     LDA #224
-    STA sprite_player+SPRITE_GROUND;screen_bottom
+    STA screen_bottom
 NoClimbingActive:
     LDA #0
     STA climbing_right_active
@@ -591,7 +591,7 @@ ReadLeft_Done:
     BEQ ReadUp_Done ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
 
     ; Check if player is on ground
-    LDA sprite_player+SPRITE_GROUND;screen_bottom ; - 2    ; Load ScreenBottom into accumulator
+    LDA screen_bottom ; - 2    ; Load ScreenBottom into accumulator
     SEC
     SBC #2
     CLC                         ; clear carry flag
@@ -721,9 +721,9 @@ UpdatePlayerPosition:
     STA sprite_player+SPRITE_Y
 
     ; Check for the bottom of screen
-    CMP sprite_player+SPRITE_GROUND;screen_bottom ;   ; Accumulator
+    CMP screen_bottom ;   ; Accumulator
     BCC UpdatePlayer_NoClamp
-    LDA sprite_player+SPRITE_GROUND;screen_bottom;
+    LDA screen_bottom;
     SEC
     SBC #1
     STA sprite_player+SPRITE_Y
