@@ -31,72 +31,68 @@ ENEMY_SQUAD_WIDTH    = 6
 ENEMY_SQUAD_HEIGHT   = 4
 ENEMY_HITBOX_WIDTH   = 4
 ENEMY_HITBOX_HEIGHT  = 4
-BULLET_HITBOX_X      = 3 ; Relative to sprite top left corner
+BULLET_HITBOX_X      = 3            ; Relative to sprite top left corner
 BULLET_HITBOX_Y      = 1
 BULLET_HITBOX_WIDTH  = 2
 BULLET_HITBOX_HEIGHT = 6
 BULLET_SPEED         = 3
 
     .rsset $0010
-joypad1_state            .rs 1
+joypad1_state            .rs 1  
 nametable_address        .rs 2
-bullet_active            .rs 1
-bullet_direction         .rs 1
-scroll_x                 .rs 1
-screen_bottom            .rs 1
-climbing_right_active    .rs 1
-climbing_left_active     .rs 1
-scroll_page              .rs 1
-player_jump_speed        .rs 2 ; in subpixels/frame -- 16bits
-player_position_sub      .rs 1 ; in subpixels
-enemy_info               .rs 4 * NUM_ENEMIES
-enemyY_speed             .rs 2
-enemyY_position_sub      .rs 1 ; in subpixels
-enemyX_speed             .rs 2
-enemyX_position_sub      .rs 1 ; in subpixels
-Assassinate              .rs 1 ; Is player assassinating bool
-hit_stop_timer           .rs 1
-hit_stop                 .rs 1 
-     
+bullet_active            .rs 1      ; bullet active bool
+bullet_direction         .rs 1      ; direction of bullet: left(0) right(1)
+scroll_x                 .rs 1      ; scroll value
+screen_bottom            .rs 1      ; ground
+climbing_right_active    .rs 1      ; climbing right bool
+climbing_left_active     .rs 1      ; climbing left bool
+scroll_page              .rs 1      ; scroll page
+player_jump_speed        .rs 2      ; in subpixels/frame -- 16bits
+player_position_sub      .rs 1      ; in subpixels
+enemyY_speed             .rs 2      ; in subpixels/frame -- 16bits 
+enemyY_position_sub      .rs 1      ; in subpixels
+enemyX_speed             .rs 2      ; in subpixels/frame -- 16bits
+enemyX_position_sub      .rs 1      ; in subpixels
+assassinate              .rs 1      ; Is player assassinating bool
+hit_stop_timer           .rs 1      ; hit stop timer
+hit_stop                 .rs 1      ; hit stop bool
+
     .rsset $0200
-sprite_player      .rs 4
-sprite_bullet      .rs 4
-sprite_wall        .rs 4
-sprite_enemy       .rs 4 * NUM_ENEMIES
+sprite_player      .rs 4            ; player sprite
+sprite_bullet      .rs 4            ; bullet sprite
+sprite_enemy       .rs 4            ; enemy sprite
 
     .rsset $0000
-SPRITE_Y           .rs 1
-SPRITE_TILE        .rs 1
-SPRITE_ATTRIB      .rs 1
-SPRITE_X           .rs 1
-SPRITE_GROUND      .rs 1
+SPRITE_Y           .rs 1            ; sprite Y position
+SPRITE_TILE        .rs 1            ; sprite tile number
+SPRITE_ATTRIB      .rs 1            ; sprite attributes
+SPRITE_X           .rs 1            ; sprite X position
+SPRITE_GROUND      .rs 1            ; sprite ground position
 
-    .rsset $0000
-; ENEMY_SPEED        .rs 1
-ENEMY_ALIVE        .rs 1
-
-ENEMY_X_SPEED       = 128     ; in subpixels/frame
-ENEMY_Y_VISION      = 50
-GRAVITY             = 16        ; in subpixels/frame^2
-ASSASSIN_FALL_SPEED = 64
-ASSINATE_RANGE      = 30
-JUMP_SPEED          = -2 * 256 - 64; in subpixels/frame
-SCREEN_BOTTOM       = 224
-HIT_STOP_LENGTH     = 7
+ENEMY_X_SPEED       = 128           ; in subpixels/frame
+ENEMY_Y_VISION      = 50            ; Y range for enemy vision
+GRAVITY             = 16            ; in subpixels/frame^2
+ASSASSIN_FALL_SPEED = 64            ; player acceleration when assassinating, in subpixels/frame^2
+ASSINATE_RANGE      = 30            ; X range for assassinating
+JUMP_SPEED          = -2 * 256 - 64 ; in subpixels/frame
+SCREEN_BOTTOM       = 224           ; Screen bottom Y value
+HIT_STOP_LENGTH     = 7             ; Number of frames to pause game for when hitting an enemy
 
 PLAYER_WIDTH        = 4
 PLAYER_HEIGHT       = 8
-PLAYER_X_OFFSET     = 6
+PLAYER_X_OFFSET     = 6     
 
-WALL1_X       = (scroll_x+5)
-WALL1_Y       = 64
-WALL1_W       = 64
-WALL1_H       = 64
+; Wall properties
+; Add scroll_x to the X value to move the collision of the walls as the background scrolls
+WALL1_X       = (scroll_x+5)            
+WALL1_Y       = 64                  
+WALL1_W       = 64                  
+WALL1_H       = 64                  
 
-WALL2_X       = (scroll_x-107)
-WALL2_Y       = 64
-WALL2_W       = 32
-WALL2_H       = 96
+WALL2_X       = (scroll_x-107)      
+WALL2_Y       = 64                  
+WALL2_W       = 32                  
+WALL2_H       = 96                  
 
     .bank 0
     .org $C000
@@ -236,7 +232,7 @@ InitialiseGame: ; Begin subroutine
     LDA #$11
     STA PPUDATA
 
-    ; Write sprite data for sprite 0
+    ; Write sprite data for sprite 0 (player)
     LDA #120    ; Y pos
     STA sprite_player + SPRITE_Y
     LDA #0      ; Tile No.
@@ -246,7 +242,7 @@ InitialiseGame: ; Begin subroutine
     LDA #128    ; X pos
     STA sprite_player + SPRITE_X
 
-    ; Write sprite data for sprite 0
+    ; Write sprite data for sprite 1 (enemy)
     LDA #135    ; Y pos
     STA sprite_enemy + SPRITE_Y
     LDA #$05      ; Tile No.
@@ -256,34 +252,8 @@ InitialiseGame: ; Begin subroutine
     LDA #60    ; X pos
     STA sprite_enemy + SPRITE_X
 
-;     ; Initialise enemies
-;     LDX #0
-;     LDA #ENEMY_SQUAD_WIDTH * ENEMY_SPACING
-;     STA temp_x
-; InitEnemies_LoopX:
-;     ; ACcumluator = temp_x here 
-;     STA sprite_enemy+SPRITE_X, x 
-;     LDA #1
-;     STA sprite_enemy+SPRITE_ATTRIB, x
-;     STA enemy_info+ENEMY_SPEED, x 
-;     STA enemy_info+ENEMY_ALIVE, x
-;     LDA #$05
-;     STA sprite_enemy+SPRITE_TILE, x 
-;     ; Increment X register by 4
-;     TXA
-;     CLC
-;     ADC #4
-;     TAX
-;     ; Loop check for x value
-;     LDA temp_x
-;     SEC
-;     SBC #ENEMY_SPACING
-;     STA temp_x
-;     BNE InitEnemies_LoopX
-
-
     ; Load nametable data 
-    LDA #$20        ; Write address $2000 to PPUADDR register
+    LDA #$20   ; Write address $2000 to PPUADDR register
     STA PPUADDR
     LDA #$00
     STA PPUADDR
@@ -305,7 +275,7 @@ LoadNametable_InnerLoop:
 LoadNametable_End:
 
     ; Load attribute data
-    LDA #$23        ; Write address $23C0 to PPUADDR register
+    LDA #$23   ; Write address $23C0 to PPUADDR register
     STA PPUADDR
     LDA #$C0
     STA PPUADDR
@@ -377,16 +347,16 @@ CheckCollisionWithWall .macro ; parameters: scroll_x, player_y, wall_x, wall_w, 
     CMP \3 + \4 + (PLAYER_X_OFFSET-1)              ; if scroll_x >= wall_x + wall_w + player_x_offset then no collision, else check Y collision
     BCS \6
     ; Check if player Y collision with wall height
-    LDA #SCREEN_BOTTOM                             ; Calculate screen_bottom - wall_h
+    LDA #SCREEN_BOTTOM
     SEC
-    SBC \5 - PLAYER_HEIGHT
+    SBC \5 - PLAYER_HEIGHT                         ; Subtract wall height and player height from the screen bottom to find top of of wall.
     CMP \2                                         ; If Screen_botttom - wall_h - Player_height >= player_y then player is on top of wall
     BCS \7                                         ; Branch to the on_top_label 
     .endm
 
-SetCollisionActive .macro ; params: collision_active (left or right)
-    LDA #1
-    STA \1
+SetClimbingActive .macro ; params: true(1) or false(0), collision_active (left or right)
+    LDA \1
+    STA \2
     .endm
 
 SetBottom .macro    ; params: wall_h
@@ -406,7 +376,7 @@ Climb .macro
 
 ResetPlayerSpeed .macro 
     LDA #0                                          ; Load 0 into accumulator
-    STA player_jump_speed                                ; Store into player_jump_speed and player_jump_speed+1
+    STA player_jump_speed                           ; Store into player_jump_speed and player_jump_speed+1
     LDA #0
     STA player_jump_speed+1
     .endm
@@ -419,35 +389,39 @@ PlayerJump .macro
     STA player_jump_speed+1
     .endm
 
-ScrollBackground .macro  ; params: Left(0) or Right(1), scroll speed,  no_scroll_label, reset (0)
-    .if \4 > 0                                      ; If not resetting scroll_x
+ScrollBackground .macro  ; params: Left(0) or Right(1), scroll speed,  no_scroll_wrap_label, reset (0)
+    ; If resetting scroll_x, jump over scrolling code
+    .if \4 > 0                                      
     LDA scroll_x
     .if \1 < 1                                      ; If direction is 0 scroll left, else scroll right 
     SEC
-    SBC \2
+    SBC \2                                          ; Subtract scroll speed from scroll_x
     .else
     CLC 
-    ADC \2
+    ADC \2                                          ; Add scroll speed to scroll_x
     .endif
-    STA scroll_x
+    STA scroll_x                                    ; Store value back into scroll_x
     STA PPUSCROLL
-    .else
-    LDA #0
+    ; else reset scroll_x
+    .else                                           
+    LDA #0                                          
     STA scroll_x
     STA PPUSCROLL
     .endif
 
     LDA sprite_enemy+SPRITE_X
-    .if \1 < 1                                      ; If direction is 0 scroll left, else scroll right 
+    ; If direction is 0 scroll left
+    .if \1 < 1                                      
     CLC
-    ADC \2
+    ADC \2                                          ; Add scroll speed to playerX
+    ; else scroll right 
     .else
     LDA sprite_enemy+SPRITE_X
     SEC
-    SBC \2
+    SBC \2                                          ; Subtract scroll speed from playerX
     .endif
     STA sprite_enemy+SPRITE_X
-    BCC \3
+    BCC \3                                          ; If carry flag is not clear scroll_x has wrapped, else branch to no_scroll_wrap_label  
     ; scroll_x has wrapped, so switch scroll_page
     LDA scroll_page
     EOR #1
@@ -461,11 +435,11 @@ ScrollBackground .macro  ; params: Left(0) or Right(1), scroll speed,  no_scroll
 
 CollisionCheck .macro
     CheckCollisionWithWall \1, \2, \3, \4, \5, \6, \7
-    SetCollisionActive \8
+    SetClimbingActive #1, \8   ; Set climbing to true
     JMP CollisionChecksDone
 \7:
     LDA #0
-    STA Assassinate     ; Stop assinate when on top of a wall 
+    STA assassinate     ; Stop assinate when on top of a wall 
     SetBottom \5
     .endm 
 
@@ -485,10 +459,9 @@ NoCollision4:
     LDA #224
     STA screen_bottom
 NoClimbingActive:
-    LDA #0
-    STA climbing_right_active
-    LDA #0
-    STA climbing_left_active    
+    ; Set both climbing bools to false
+    SetClimbingActive #0, climbing_right_active
+    SetClimbingActive #0, climbing_left_active   
 CollisionChecksDone:
 
     ; Initialise controller 1
@@ -539,7 +512,7 @@ ReadRight_Done:
     LDA joypad1_state
     AND #BUTTON_DOWN
     BEQ ReadDown_Done; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
-    LDA Assassinate
+    LDA assassinate
     BNE ReadDown_Done
     LDA sprite_player+SPRITE_X
     CLC
@@ -553,9 +526,9 @@ ReadRight_Done:
     LDA sprite_enemy+SPRITE_Y
     CMP sprite_player+SPRITE_X      ; if enemyY >= playerY set carry flag
     BCC ReadDown_Done
-    ; Set Assassinate to true (1)
+    ; Set assassinate to true (1)
     LDA #1
-    STA Assassinate
+    STA assassinate
     LDA #0                  ; Set player speed to zero
     STA player_jump_speed        ; (both bytes)
     STA player_jump_speed+1
@@ -678,7 +651,7 @@ ShootRight:
 
 UpdateBullet_Done:
 
-AssassinateEnemy .macro   ; enemyX 
+assassinateEnemy .macro   ; enemyX 
     LDA player_jump_speed    ; Low 8 bits
     CLC
     ADC #LOW(ASSASSIN_FALL_SPEED)
@@ -688,17 +661,17 @@ AssassinateEnemy .macro   ; enemyX
     STA player_jump_speed+1
     LDA sprite_player+SPRITE_X
     CMP \1    ; if playerX >= enemyX set carry flag
-    BCS AssassinateLeft
+    BCS assassinateLeft
     ScrollBackground #1, #2, Scroll_NoWrap4, #1
     JMP UpdatePlayerPosition
-AssassinateLeft:
+assassinateLeft:
     ScrollBackground #0, #2, Scroll_NoWrap5, #1
     JMP UpdatePlayerPosition
     .endm
 
-    LDA Assassinate
+    LDA assassinate
     BEQ NotAssassinating
-    AssassinateEnemy sprite_enemy+SPRITE_X
+    assassinateEnemy sprite_enemy+SPRITE_X
 
 NotAssassinating:
     ; Update player sprite
@@ -835,7 +808,6 @@ CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, o
     ; Handle collision
     LDA #0
     STA bullet_active             ; Destroy the bullet
-    STA enemy_info+ENEMY_ALIVE    ; Destroy the enemy
     LDA #$FF
     STA sprite_bullet+SPRITE_X
     LDA sprite_enemy+SPRITE_X
@@ -846,15 +818,9 @@ UpdateEnemies_NoCollision:
     ; Check collision with bullet
     CheckCollisionWithEnemy sprite_player+SPRITE_X, sprite_player+SPRITE_Y, #0, #0, #PLAYER_WIDTH, #PLAYER_HEIGHT, JumpToNoCollisionLabel
     ; Handle collision
-    LDA Assassinate
+    LDA assassinate
     BEQ PlayerKilled
-    ; LDA #0
-    ; STA enemy_info+ENEMY_ALIVE      ; Destroy the enemy
-    ; LDA sprite_enemy+SPRITE_X
-    ; CLC
-    ; ADC #100
-    ; STA sprite_enemy+SPRITE_X
-                   ; Set Assassinate to false (0)
+    
     LDA #HIT_STOP_LENGTH
     STA hit_stop_timer
     LDA #1
@@ -879,9 +845,8 @@ UpdateHit_Stop:
     JMP UpdateEnemies_End
 HitStop_Complete:
     ; Kill enemy and respawn
-    LDA #0
-    STA enemy_info+ENEMY_ALIVE ; Destroy the enemy
-    STA Assassinate            ; Stop assassinating
+    LDA #0 
+    STA assassinate            ; Set assinate to false assassinating
     STA hit_stop               ; Stop hit stop       
     LDA sprite_enemy+SPRITE_X
     CLC
