@@ -57,7 +57,8 @@ assassinate              .rs 1      ; Is player assassinating bool
 hit_stop_timer           .rs 1      ; hit stop timer
 hit_stop                 .rs 1      ; hit stop bool
 InAssassinateRange       .rs 1      ; Is in assassination range bool
-player_anim_state        .rs 1
+player_anim_state        .rs 1      ; Player animation state
+next_bullet_direction    .rs 1      ; next bullet direction
 
     .rsset $0200
 sprite_player      .rs 4            ; player sprite
@@ -235,7 +236,7 @@ InitialiseGame: ; Begin subroutine
     LDA #$11
     STA PPUDATA
 
-    ; Write the palette 1 colours (enemy)
+    ; Write the palette 2 colours (enemy when in assassination range)
     LDA #$1D
     STA PPUDATA
     LDA #$3D
@@ -457,13 +458,13 @@ ScrollBackground .macro  ; params: Left(0) or Right(1), scroll speed,  no_scroll
     STA PPUSCROLL  
     .endm
 
-SpawnBullet .macro ; parameters: direction
+SpawnBullet .macro
     LDA #1
     STA bullet_active
-    .if \1 < 1
-    LDA #0
-    .endif
-    STA bullet_direction
+    ; .if \1 < 1
+    ; LDA #0
+    ; .endif
+    ; STA bullet_direction
     LDA sprite_player + SPRITE_Y   ; Y pos
     STA sprite_bullet + SPRITE_Y
     SetSpriteTile #2, sprite_bullet
@@ -471,12 +472,12 @@ SpawnBullet .macro ; parameters: direction
     STA sprite_bullet + SPRITE_ATTRIB
     LDA sprite_player + SPRITE_X   ; X pos
     STA sprite_bullet + SPRITE_X
-    .if \1 > 0
-    ; Flip the sprite if shooting left 
+    LDA bullet_direction
+    BEQ ReadB_Done
+    ; Flip the sprite if shooting left (if direction == 1)
     LDA sprite_bullet+SPRITE_ATTRIB
     EOR #%01000000
     STA sprite_bullet+SPRITE_ATTRIB
-    .endif
     .endm
 
 CollisionCheck .macro
@@ -509,7 +510,7 @@ NoClimbingActive:
     ; Set both climbing bools to false
     SetClimbingActive #0, climbing_right_active
     SetClimbingActive #0, climbing_left_active
-    SetSpriteTile #0, sprite_player   
+    ;SetSpriteTile #0, sprite_player   
 CollisionChecksDone:
 
 ; Check if player in assassinate range
@@ -576,6 +577,16 @@ RightPressed:
 NoWallCollision:
     ; Scrolls background left (so player moves right)
     ScrollBackground #1, #1, Scroll_NoWrap, #1
+    ; Set bullet direction
+    LDA bullet_active
+    BNE SetNextBulletDirection
+    LDA #0
+    STA bullet_direction
+    JMP UpdateSpriteTile
+SetNextBulletDirection:
+    LDA #0
+    STA next_bullet_direction
+UpdateSpriteTile:
     ; Update sprite tile (ANIMATION)
     LDA player_anim_state
     BEQ ZeroState
@@ -600,25 +611,29 @@ ReadRight_Done:
 
 ; React to Down button
 
-    LDA joypad1_state
-    AND #BUTTON_DOWN
-    BEQ ReadDown_Done              ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
-    LDA assassinate
-    BNE ReadDown_Done
-    LDA InAssassinateRange
-    BEQ ReadDown_Done
-    LDA #1
-    STA assassinate
-    LDA #0                         ; Set player speed to zero
-    STA player_jump_speed          ;  (both bytes)
-    STA player_jump_speed+1
+    ; LDA joypad1_state
+    ; AND #BUTTON_DOWN
+    ; BEQ ReadDown_Done              ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
+    ; LDA assassinate
+    ; BNE ReadDown_Done
+    ; LDA InAssassinateRange
+    ; BEQ ReadDown_Done
+    ; LDA #1
+    ; STA assassinate
+    ; LDA #0                         ; Set player speed to zero
+    ; STA player_jump_speed          ;  (both bytes)
+    ; STA player_jump_speed+1
 ReadDown_Done:
 
 ; React to Left button
 
     LDA joypad1_state
     AND #BUTTON_LEFT
-    BEQ ReadLeft_Done              ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button 
+    BEQ ReadLeftDone_JUMP              ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button 
+    JMP LeftPressed
+ReadLeftDone_JUMP:
+    JMP ReadLeft_Done
+LeftPressed:
     ; If not climbing branch to NoWallCollision
     LDA climbing_left_active
     BEQ NoWallCollision2
@@ -631,6 +646,15 @@ ReadDown_Done:
 NoWallCollision2:
     ; Scrolls background right (so player moves left)
     ScrollBackground #0, #1, Scroll_NoWrap2, #1
+    LDA bullet_active
+    BNE SetNextBulletDirection2
+    LDA #1
+    STA bullet_direction
+    JMP UpdateSpriteTile2
+SetNextBulletDirection2:
+    LDA #1
+    STA next_bullet_direction
+UpdateSpriteTile2:
     ; Update sprite tile (ANIMATION)
     LDA player_anim_state
     BEQ ZeroState2
@@ -674,11 +698,15 @@ ReadUp_Done:
     LDA joypad1_state
     AND #BUTTON_A
     BEQ ReadA_Done                 ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
-    ; Spawn a bullet
-    LDA bullet_active
-    BNE ReadA_Done                 ; check if bullet is active (checks if bullet_active is not equal to 0)
-    ; No bullet active, so spawn a new one
-    SpawnBullet #0
+    LDA assassinate
+    BNE ReadA_Done
+    LDA InAssassinateRange
+    BEQ ReadA_Done
+    LDA #1
+    STA assassinate
+    LDA #0                         ; Set player speed to zero
+    STA player_jump_speed          ;  (both bytes)
+    STA player_jump_speed+1
 
 ReadA_Done:
 
@@ -691,7 +719,7 @@ ReadA_Done:
     LDA bullet_active
     BNE ReadB_Done                 ; check if bullet is active (checks if bullet_active is not equal to 0)
     ; No bullet active, so spawn a new one
-    SpawnBullet #1
+    SpawnBullet
 
 ReadB_Done:
 
@@ -699,7 +727,7 @@ ReadB_Done:
     LDA bullet_active
     ; Check if bullet is active              
     BEQ UpdateBullet_Done
-    ; Check bullet shoot direction
+    ; Check bullet shoot direction, right(0) left (1)
     LDA bullet_direction
     BEQ ShootRight
     ; Shoot bullet LEFT
@@ -721,6 +749,8 @@ DestroyBullet
     ; If carry flag is set, bullet has left the top of the screen -- destroy it
     LDA #0
     STA bullet_active
+    LDA next_bullet_direction
+    STA bullet_direction
 
 UpdateBullet_Done:
 
@@ -750,6 +780,7 @@ assassinateLeft:
 
     LDA assassinate
     BEQ NotAssassinating
+    ; Moves player straight to enemy and kills the enemy
     assassinateEnemy 
 
 NotAssassinating:
@@ -930,7 +961,8 @@ HitStop_Complete:
     LDA sprite_enemy+SPRITE_X
     CLC
     ADC #100
-    STA sprite_enemy+SPRITE_X    
+    STA sprite_enemy+SPRITE_X
+    SetSpriteTile #0, sprite_player    
 UpdateEnemies_NoCollisionWithPlayer:
     
 UpdateEnemies_End:
