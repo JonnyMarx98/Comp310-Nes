@@ -57,6 +57,7 @@ assassinate              .rs 1      ; Is player assassinating bool
 hit_stop_timer           .rs 1      ; hit stop timer
 hit_stop                 .rs 1      ; hit stop bool
 InAssassinateRange       .rs 1      ; Is in assassination range bool
+player_anim_state        .rs 1
 
     .rsset $0200
 sprite_player      .rs 4            ; player sprite
@@ -69,7 +70,7 @@ SPRITE_TILE        .rs 1            ; sprite tile number
 SPRITE_ATTRIB      .rs 1            ; sprite attributes
 SPRITE_X           .rs 1            ; sprite X position
 SPRITE_GROUND      .rs 1            ; sprite ground position
-SPRITE_ANIM        .rs 1
+
 
 ENEMY_X_SPEED       = 128           ; in subpixels/frame
 ENEMY_Y_VISION      = 50            ; Y range for enemy vision
@@ -576,18 +577,18 @@ NoWallCollision:
     ; Scrolls background left (so player moves right)
     ScrollBackground #1, #1, Scroll_NoWrap, #1
     ; Update sprite tile (ANIMATION)
-    LDA sprite_player+SPRITE_ANIM
+    LDA player_anim_state
     BEQ ZeroState
     ; Accumulator is 0
     STA sprite_player+SPRITE_TILE
     LDA #0
-    STA sprite_player+SPRITE_ANIM
+    STA player_anim_state
     JMP SpriteTile_Updated
 ZeroState:
     ; Accumulator is 1
     STA sprite_player+SPRITE_TILE
     LDA #1
-    STA sprite_player+SPRITE_ANIM
+    STA player_anim_state
 SpriteTile_Updated:
     ; Check if player is on a left wall
     LDA climbing_left_active   
@@ -631,16 +632,16 @@ NoWallCollision2:
     ; Scrolls background right (so player moves left)
     ScrollBackground #0, #1, Scroll_NoWrap2, #1
     ; Update sprite tile (ANIMATION)
-    LDA sprite_player+SPRITE_ANIM
+    LDA player_anim_state
     BEQ ZeroState2
     SetSpriteTile #$15, sprite_player
     LDA #0
-    STA sprite_player+SPRITE_ANIM
+    STA player_anim_state
     JMP SpriteTile_Updated2
 ZeroState2:
-    SetSpriteTile #$14, sprite_player
+    SetSpriteTile #$14, sprite_player  
     LDA #1
-    STA sprite_player+SPRITE_ANIM
+    STA player_anim_state
 SpriteTile_Updated2: 
     ; Check if player is on right wall
     LDA climbing_right_active   
@@ -738,7 +739,7 @@ assassinateEnemy .macro
     ; assassinate right
     ScrollBackground #1, #2, Scroll_NoWrap4, #1
     ; Set sprite tile to assassinate tile
-    SetSpriteTile #$16, sprite_player
+    SetSpriteTile #$16, sprite_player  
     JMP UpdatePlayerPosition
 assassinateLeft:
     ScrollBackground #0, #2, Scroll_NoWrap5, #1
