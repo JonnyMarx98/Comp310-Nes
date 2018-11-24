@@ -59,11 +59,20 @@ hit_stop                 .rs 1      ; hit stop bool
 InAssassinateRange       .rs 1      ; Is in assassination range bool
 player_anim_state        .rs 1      ; Player animation state
 next_bullet_direction    .rs 1      ; next bullet direction
+score                    .rs 1
 
     .rsset $0200
 sprite_player      .rs 4            ; player sprite
 sprite_bullet      .rs 4            ; bullet sprite
+sprite_score1      .rs 4            ; Score text sprites
+sprite_score2      .rs 4
+sprite_score3      .rs 4
+sprite_score4      .rs 4
+sprite_score5      .rs 4
+sprite_score_num   .rs 4            ; Score number sprite
+sprite_score_num2  .rs 4            ; Score number sprite
 sprite_enemy       .rs 4            ; enemy sprite
+
 
     .rsset $0000
 SPRITE_Y           .rs 1            ; sprite Y position
@@ -80,7 +89,7 @@ ASSASSIN_FALL_SPEED = 64            ; player acceleration when assassinating, in
 ASSINATE_RANGE      = 30            ; X range for assassinating
 JUMP_SPEED          = -2 * 256 - 64 ; in subpixels/frame
 SCREEN_BOTTOM       = 224           ; Screen bottom Y value
-HIT_STOP_LENGTH     = 7             ; Number of frames to pause game for when hitting an enemy
+HIT_STOP_LENGTH     = 10             ; Number of frames to pause game for when hitting an enemy
 
 PLAYER_WIDTH        = 4
 PLAYER_HEIGHT       = 8
@@ -255,7 +264,7 @@ InitialiseGame: ; Begin subroutine
     STA sprite_player + SPRITE_X
 
     ; Write sprite data for sprite 1 (enemy)
-    LDA #135    ; Y pos
+    LDA #130    ; Y pos
     STA sprite_enemy + SPRITE_Y
     LDA #$05      ; Tile No.
     STA sprite_enemy + SPRITE_TILE
@@ -263,6 +272,51 @@ InitialiseGame: ; Begin subroutine
     STA sprite_enemy + SPRITE_ATTRIB
     LDA #60    ; X pos
     STA sprite_enemy + SPRITE_X
+
+    ; Write sprite data for sprites 3 to 8
+    LDA #10    ; Y pos
+    STA sprite_score1 + SPRITE_Y
+    STA sprite_score2 + SPRITE_Y
+    STA sprite_score3 + SPRITE_Y
+    STA sprite_score4 + SPRITE_Y
+    STA sprite_score5 + SPRITE_Y
+    STA sprite_score_num + SPRITE_Y
+    STA sprite_score_num2 + SPRITE_Y
+    LDA #$44      ; Tile No.
+    STA sprite_score1 + SPRITE_TILE
+    LDA #$45      ; Tile No.
+    STA sprite_score2 + SPRITE_TILE
+    LDA #$46      ; Tile No.
+    STA sprite_score3 + SPRITE_TILE
+    LDA #$47      ; Tile No.
+    STA sprite_score4 + SPRITE_TILE
+    LDA #$48      ; Tile No.
+    STA sprite_score5 + SPRITE_TILE
+    LDA #$80      ; Tile No.
+    STA sprite_score_num + SPRITE_TILE
+    STA sprite_score_num2 + SPRITE_TILE
+    LDA #0   ; Attributes (different palettes?)
+    STA sprite_score1 + SPRITE_ATTRIB
+    STA sprite_score2 + SPRITE_ATTRIB
+    STA sprite_score3 + SPRITE_ATTRIB
+    STA sprite_score4 + SPRITE_ATTRIB
+    STA sprite_score5 + SPRITE_ATTRIB
+    STA sprite_score_num + SPRITE_ATTRIB
+    STA sprite_score_num2 + SPRITE_ATTRIB
+    LDA #8          ; X pos
+    STA sprite_score1 + SPRITE_X
+    LDA #16         ; X pos
+    STA sprite_score2 + SPRITE_X
+    LDA #24         ; X pos
+    STA sprite_score3 + SPRITE_X
+    LDA #32         ; X pos
+    STA sprite_score4 + SPRITE_X
+    LDA #40         ; X pos
+    STA sprite_score5 + SPRITE_X
+    LDA #50         ; X pos
+    STA sprite_score_num + SPRITE_X
+    LDA #56         ; X pos
+    STA sprite_score_num2 + SPRITE_X
 
     ; Load nametable data 
     LDA #$20   ; Write address $2000 to PPUADDR register
@@ -412,6 +466,13 @@ PlayerJump .macro
 SetSpriteTile .macro ; parameters: tile_number, sprite
     LDA \1
     STA \2+SPRITE_TILE
+    .endm
+
+IncrementScore .macro
+    LDA score
+    CLC
+    ADC #1
+    STA score
     .endm
 
 ScrollBackground .macro  ; params: Left(0) or Right(1), scroll speed,  no_scroll_wrap_label, reset (0)
@@ -611,18 +672,10 @@ ReadRight_Done:
 
 ; React to Down button
 
-    ; LDA joypad1_state
-    ; AND #BUTTON_DOWN
-    ; BEQ ReadDown_Done              ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
-    ; LDA assassinate
-    ; BNE ReadDown_Done
-    ; LDA InAssassinateRange
-    ; BEQ ReadDown_Done
-    ; LDA #1
-    ; STA assassinate
-    ; LDA #0                         ; Set player speed to zero
-    ; STA player_jump_speed          ;  (both bytes)
-    ; STA player_jump_speed+1
+    LDA joypad1_state
+    AND #BUTTON_DOWN
+    BEQ ReadDown_Done              ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
+
 ReadDown_Done:
 
 ; React to Left button
@@ -920,23 +973,34 @@ CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, o
     STA bullet_active             ; Destroy the bullet
     LDA #$FF
     STA sprite_bullet+SPRITE_X
+    ; Respawn enemy
     LDA sprite_enemy+SPRITE_X
     CLC
     ADC #100
     STA sprite_enemy+SPRITE_X
+    ; Add 1 to score
+    IncrementScore
 UpdateEnemies_NoCollision:
     ; Check collision with bullet
     CheckCollisionWithEnemy sprite_player+SPRITE_X, sprite_player+SPRITE_Y, #0, #0, #PLAYER_WIDTH, #PLAYER_HEIGHT, JumpToNoCollisionLabel
     ; Handle collision
     LDA assassinate
     BEQ PlayerKilled
-    
+    ; Add 1 to score
+    IncrementScore
     LDA #HIT_STOP_LENGTH
     STA hit_stop_timer
     LDA #1
     STA hit_stop        ; Set hit stop to true
     JMP UpdateHit_Stop
 PlayerKilled:
+    ; Reset score
+    LDA #0
+    STA score
+    LDA #$80
+    STA sprite_score_num+SPRITE_TILE
+    STA sprite_score_num2+SPRITE_TILE
+    ; Respawn player
     LDA sprite_player+SPRITE_Y
     CLC
     ADC #100
@@ -966,6 +1030,23 @@ HitStop_Complete:
 UpdateEnemies_NoCollisionWithPlayer:
     
 UpdateEnemies_End:
+    LDA score
+    CMP #10      ; If score >= 10
+    BCS IncrementTensDigit 
+    CLC 
+    ADC #$80     ; Add 80 because the number sprites start at tile 80
+    STA sprite_score_num2+SPRITE_TILE
+    JMP ScoreUpdateDone
+IncrementTensDigit:
+    LDA #0
+    STA score
+    LDA #$80
+    STA sprite_score_num2+SPRITE_TILE
+    LDA sprite_score_num+SPRITE_TILE
+    CLC
+    ADC #1
+    STA sprite_score_num+SPRITE_TILE
+ScoreUpdateDone:
     
 
     ; copy sprite data to ppu
@@ -1023,4 +1104,4 @@ NametableData:
 
     .bank 2
     .org $0000
-    .incbin "Robot.chr"
+    .incbin "Sprites.chr"
