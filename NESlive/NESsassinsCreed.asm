@@ -75,7 +75,6 @@ SPRITE_GROUND      .rs 1            ; sprite ground position
 PLAYER_WIDTH        = 4
 PLAYER_HEIGHT       = 8
 PLAYER_X_OFFSET     = 6 
-PLAYER_RESPAWN      = 100
 ASSASSIN_FALL_SPEED = 64            ; player acceleration when assassinating, in subpixels/frame^2
 ASSINATE_RANGE      = 30            ; X range for assassinating
 JUMP_SPEED          = -2 * 256 - 64 ; in subpixels/frame (-2.25)

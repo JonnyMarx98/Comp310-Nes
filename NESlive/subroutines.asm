@@ -488,18 +488,8 @@ UpdateEnemy_NoCollision:
     STA hit_stop            ; Set hit stop to true
     JMP UpdateEnemy_End
 PlayerKilled:
-    ; Reset score
-    LDA #0
-    STA score
-    LDA #$80
-    STA sprite_score_num+SPRITE_TILE
-    STA sprite_score_num2+SPRITE_TILE
-    ; Respawn player
-    LDA sprite_player+SPRITE_Y
-    CLC
-    ADC #PLAYER_RESPAWN
-    STA sprite_player+SPRITE_Y
-    ScrollBackground #0, #1, Scroll_NoWrap3, #0
+    ; Reload the game
+    JMP RESET
 UpdateEnemy_End:
     RTS    ; End subroutine
 
