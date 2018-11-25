@@ -78,7 +78,7 @@ PLAYER_X_OFFSET     = 6
 PLAYER_RESPAWN      = 100
 ASSASSIN_FALL_SPEED = 64            ; player acceleration when assassinating, in subpixels/frame^2
 ASSINATE_RANGE      = 30            ; X range for assassinating
-JUMP_SPEED          = -2 * 256 - 64 ; in subpixels/frame
+JUMP_SPEED          = -2 * 256 - 64 ; in subpixels/frame (-2.25)
 
 ; Enemy constants
 ENEMY_RESPAWN       = 100
@@ -92,10 +92,10 @@ ENEMY_HITBOX_HEIGHT  = 4
 ; Other constants
 GRAVITY             = 16            ; in subpixels/frame^2
 SCREEN_BOTTOM       = 224           ; Screen bottom Y value
-HIT_STOP_LENGTH     = 10             ; Number of frames to pause game for when hitting an enemy
+HIT_STOP_LENGTH     = 10            ; Number of frames to pause game for when hitting an enemy
 
 ; Arrow constants
-ARROW_HITBOX_X      = 3            ; Relative to sprite top left corner
+ARROW_HITBOX_X      = 3             ; Relative to sprite top left corner
 ARROW_HITBOX_Y      = 1
 ARROW_HITBOX_WIDTH  = 2
 ARROW_HITBOX_HEIGHT = 6
@@ -194,100 +194,13 @@ vblankwait2:
 forever:
     JMP forever
 
-; ------------------------------------------------------
-
-InitialiseGame: ; Begin subroutine     
-
-    ; Reset the PPU high/low latch
-    LDA PPUSTATUS
-
-    ; Write sprite data and initialise sprites
-    INCLUDE "sprite_data.asm"
-
-    ; Load nametable data 
-    LDA #$20   ; Write address $2000 to PPUADDR register
-    STA PPUADDR
-    LDA #$00
-    STA PPUADDR
-
-    LDA #LOW(NametableData)
-    STA nametable_address
-    LDA #HIGH(NametableData)
-    STA nametable_address+1
-LoadNametable_OuterLoop:
-    LDY #0
-LoadNametable_InnerLoop:
-    LDA [nametable_address], Y
-    BEQ LoadNametable_End
-    STA PPUDATA
-    INY
-    BNE LoadNametable_InnerLoop
-    INC nametable_address+1
-    JMP LoadNametable_OuterLoop
-LoadNametable_End:
-
-    ; Load attribute data
-    LDA #$23   ; Write address $23C0 to PPUADDR register
-    STA PPUADDR
-    LDA #$C0
-    STA PPUADDR
-
-    LDA #%01010101
-    LDX #64
-LoadAttributes_Loop:
-    STA PPUDATA
-    DEX
-    BNE LoadAttributes_Loop
-    
-    ; Load nametable data 
-    LDA #$24        ; Write address $2000 to PPUADDR register
-    STA PPUADDR
-    LDA #$00
-    STA PPUADDR
-
-    LDA #LOW(NametableData)
-    STA nametable_address
-    LDA #HIGH(NametableData)
-    STA nametable_address+1
-LoadNametable2_OuterLoop:
-    LDY #0
-LoadNametable2_InnerLoop:
-    LDA [nametable_address], Y
-    BEQ LoadNametable2_End
-    STA PPUDATA
-    INY
-    BNE LoadNametable2_InnerLoop
-    INC nametable_address+1
-    JMP LoadNametable2_OuterLoop
-LoadNametable2_End:
-
-    ; Load attribute data
-    LDA #$27        ; Write address $23C0 to PPUADDR register
-    STA PPUADDR
-    LDA #$C0
-    STA PPUADDR
-
-    LDA #%01010101
-    LDX #64
-LoadAttributes2_Loop:
-    STA PPUDATA
-    DEX
-    BNE LoadAttributes2_Loop
-    
-
-    RTS ; End subroutine
-; ----------------------------------------------------------------------------
-
-; NMI is called on every frame
-NMI:
     ; Include macros
     INCLUDE "macros.asm" 
 
-    LDA hit_stop
-    BEQ NoHit_Stop
+; NMI is called on every frame
+NMI:
+    ; Check for hit stop and update hitstop if it is active
     JSR UpdateHit_Stop
-    JMP UpdateGame_End
-NoHit_Stop:
     ; Check if player is colliding with the walls 
     JSR CheckWallCollisions
     ; Check if the player is in assassination range

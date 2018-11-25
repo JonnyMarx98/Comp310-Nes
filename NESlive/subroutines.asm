@@ -1,5 +1,87 @@
+;------------------------------ INITIALISE GAME-----------------------;
+InitialiseGame: ; Begin subroutine     
+
+    ; Reset the PPU high/low latch
+    LDA PPUSTATUS
+
+    ; Write sprite data and initialise sprites
+    INCLUDE "sprite_data.asm"
+
+    ; Load nametable data 
+    LDA #$20   ; Write address $2000 to PPUADDR register
+    STA PPUADDR
+    LDA #$00
+    STA PPUADDR
+
+    LDA #LOW(NametableData)
+    STA nametable_address
+    LDA #HIGH(NametableData)
+    STA nametable_address+1
+LoadNametable_OuterLoop:
+    LDY #0
+LoadNametable_InnerLoop:
+    LDA [nametable_address], Y
+    BEQ LoadNametable_End
+    STA PPUDATA
+    INY
+    BNE LoadNametable_InnerLoop
+    INC nametable_address+1
+    JMP LoadNametable_OuterLoop
+LoadNametable_End:
+
+    ; Load attribute data
+    LDA #$23   ; Write address $23C0 to PPUADDR register
+    STA PPUADDR
+    LDA #$C0
+    STA PPUADDR
+
+    LDA #%01010101
+    LDX #64
+LoadAttributes_Loop:
+    STA PPUDATA
+    DEX
+    BNE LoadAttributes_Loop
+    
+    ; Load nametable data 
+    LDA #$24        ; Write address $2000 to PPUADDR register
+    STA PPUADDR
+    LDA #$00
+    STA PPUADDR
+
+    LDA #LOW(NametableData)
+    STA nametable_address
+    LDA #HIGH(NametableData)
+    STA nametable_address+1
+LoadNametable2_OuterLoop:
+    LDY #0
+LoadNametable2_InnerLoop:
+    LDA [nametable_address], Y
+    BEQ LoadNametable2_End
+    STA PPUDATA
+    INY
+    BNE LoadNametable2_InnerLoop
+    INC nametable_address+1
+    JMP LoadNametable2_OuterLoop
+LoadNametable2_End:
+
+    ; Load attribute data
+    LDA #$27        ; Write address $23C0 to PPUADDR register
+    STA PPUADDR
+    LDA #$C0
+    STA PPUADDR
+
+    LDA #%01010101
+    LDX #64
+LoadAttributes2_Loop:
+    STA PPUDATA
+    DEX
+    BNE LoadAttributes2_Loop
+    
+
+    RTS    ; End subroutine ; End subroutine
+
 ;------------------------------ READ JOYPAD-----------------------;
-ReadJoypad:
+ReadJoypad: ; Begin subroutine
 
 ;----- INITIALISE CONTROLLER-----;
 
@@ -179,10 +261,10 @@ ReadA_Done:
     SpawnArrow
 
 ReadB_Done:
-    RTS 
+    RTS    ; End subroutine 
 
 ;----------------------- UPDATE ARROW--------------------;
-UpdateArrow: 
+UpdateArrow: ; Begin subroutine
 ; Update the arrow
     LDA arrow_active
     ; Check if arrow is active              
@@ -213,10 +295,10 @@ DestroyArrow
     STA arrow_direction
 
 UpdateArrow_Done:
-    RTS 
+    RTS    ; End subroutine 
 
 ;----------------------- UPDATE PLAYER--------------------;
-UpdatePlayer:
+UpdatePlayer: ; Begin subroutine
     ; Check if player is assassinating
     LDA assassinate
     BEQ NotAssassinating
@@ -252,10 +334,10 @@ UpdatePlayerPosition:
     STA player_jump_speed      ; (both bytes)
     STA player_jump_speed+1
 UpdatePlayer_NoClamp:
-    RTS
+    RTS    ; End subroutine
 
 ;----------- CHECK ASSASSINATION RANGE--------;
-CheckAssassinationRange:
+CheckAssassinationRange: ; Begin subroutine
     ; Check if player in assassinate range
     LDA sprite_player+SPRITE_X
     CLC
@@ -282,10 +364,10 @@ NotInRange:
     LDA #1
     STA sprite_enemy+SPRITE_ATTRIB ; Set enemy attributes (Reset back to normal colour when not in range)
 AssassinateRangeCheck_Done:
-    RTS
+    RTS    ; End subroutine
 
 ;--------------- WALL COLLISION CHECKS-------------;
-CheckWallCollisions:
+CheckWallCollisions: ; Begin subroutine
 
     ; CollisionCheck parameters: scroll_x, player_y, wall_x, wall_w, wall_h, no_collision_label, on_top_label, climbing_active_direction, left(0) or right (1)
     ; RIGHT COLLISIONS
@@ -310,10 +392,10 @@ NoClimbingActive:
     SetClimbingActive #0, climbing_left_active
     ;SetSpriteTile #0, sprite_player   
 CollisionChecksDone:
-    RTS
+    RTS    ; End subroutine
 
-;---------------- UPDATE ENEMY---------------;
-UpdateEnemy:
+;----------------------- UPDATE ENEMY------------------------;
+UpdateEnemy: ; Begin subroutine
     ; Check if enemy can see player
     LDA sprite_player+SPRITE_Y
     CMP #SCREEN_BOTTOM - ENEMY_Y_VISION   ; if playerX >= bottom + enemy Y vision branch to MoveEnemyTowardsPlayer
@@ -373,10 +455,10 @@ EnemyX_Updated:
     STA enemyY_speed                      ; (both bytes)
     STA enemyY_speed+1
 UpdateEnemy_NoClamp:
-    RTS
+    RTS    ; End subroutine
 
 ;---------------- CHECK ENEMY COLLISIONS---------------;
-CheckEnemyCollisions:
+CheckEnemyCollisions: ; Begin subroutine
 
     ; Check collision with arrow
     CheckCollisionWithEnemy sprite_arrow+SPRITE_X, sprite_arrow+SPRITE_Y, #ARROW_HITBOX_X, #ARROW_HITBOX_Y, #ARROW_HITBOX_WIDTH, #ARROW_HITBOX_HEIGHT, UpdateEnemy_NoCollision
@@ -419,16 +501,18 @@ PlayerKilled:
     STA sprite_player+SPRITE_Y
     ScrollBackground #0, #1, Scroll_NoWrap3, #0
 UpdateEnemy_End:
-    RTS
+    RTS    ; End subroutine
 
 ;---------------- UPDATE HITSTOP---------------;
 UpdateHit_Stop:
+    LDA hit_stop
+    BEQ UpdateHit_Stop_End     ; If theres no hit stop active, branch to UpdateHit_Stop_End
     LDA hit_stop_timer
     BEQ HitStop_Complete
     SEC
     SBC #1                     ; Decrement hit stop timer
     STA hit_stop_timer
-    JMP UpdateHit_Stop_End
+    JMP UpdateGame_End
 HitStop_Complete:
     ; Kill enemy and respawn
     LDA #0 
@@ -441,9 +525,9 @@ HitStop_Complete:
     STA sprite_enemy+SPRITE_X
     SetSpriteTile #0, sprite_player
 UpdateHit_Stop_End:     
-    RTS  
+    RTS    ; End subroutine  
 
-; ;---------------- UPDATE SCORE---------------;
+;---------------- UPDATE SCORE---------------;
 UpdateScore:
     LDA score
     CMP #10      ; If score >= 10 increment tens digit
@@ -465,4 +549,4 @@ IncrementTensDigit:
     ADC #1
     STA sprite_score_num+SPRITE_TILE
 ScoreUpdateDone:
-    RTS    
+    RTS    ; End subroutine    
