@@ -29,8 +29,8 @@ BUTTON_RIGHT  = %00000001
     .rsset $0010
 joypad1_state            .rs 1  
 nametable_address        .rs 2
-arrow_active            .rs 1       ; arrow active bool
-arrow_direction         .rs 1       ; direction of arrow: left(0) right(1)
+arrow_active             .rs 1      ; arrow active bool
+arrow_direction          .rs 1      ; direction of arrow: left(0) right(1)
 scroll_x                 .rs 1      ; scroll value
 screen_bottom            .rs 1      ; ground
 climbing_right_active    .rs 1      ; climbing right bool
@@ -70,6 +70,7 @@ SPRITE_TILE        .rs 1            ; sprite tile number
 SPRITE_ATTRIB      .rs 1            ; sprite attributes
 SPRITE_X           .rs 1            ; sprite X position
 SPRITE_GROUND      .rs 1            ; sprite ground position
+
 ; Player constants
 PLAYER_WIDTH        = 4
 PLAYER_HEIGHT       = 8
@@ -78,6 +79,7 @@ PLAYER_RESPAWN      = 100
 ASSASSIN_FALL_SPEED = 64            ; player acceleration when assassinating, in subpixels/frame^2
 ASSINATE_RANGE      = 30            ; X range for assassinating
 JUMP_SPEED          = -2 * 256 - 64 ; in subpixels/frame
+
 ; Enemy constants
 ENEMY_RESPAWN       = 100
 ENEMY_X_SPEED       = 128           ; in subpixels/frame
@@ -86,6 +88,7 @@ ENEMY_SQUAD_WIDTH    = 6
 ENEMY_SQUAD_HEIGHT   = 4
 ENEMY_HITBOX_WIDTH   = 4
 ENEMY_HITBOX_HEIGHT  = 4
+
 ; Other constants
 GRAVITY             = 16            ; in subpixels/frame^2
 SCREEN_BOTTOM       = 224           ; Screen bottom Y value
@@ -192,133 +195,13 @@ forever:
 
 ; ------------------------------------------------------
 
-InitialiseGame: ; Begin subroutine
+InitialiseGame: ; Begin subroutine       
 
     ; Reset the PPU high/low latch
     LDA PPUSTATUS
 
-    ; Write address $3F00 (background palette) to the PPU
-    LDA #$3F
-    STA PPUADDR
-    LDA #$00
-    STA PPUADDR
-
-    ; Write the background palette
-    LDA #$31
-    STA PPUDATA
-    LDA #$13
-    STA PPUDATA
-    LDA #$23
-    STA PPUDATA
-    LDA #$33
-    STA PPUDATA
-    LDA #$31
-    STA PPUDATA
-    LDA #$07
-    STA PPUDATA
-    LDA #$17
-    STA PPUDATA
-    LDA #$27
-    STA PPUDATA
-
-    ; Write address $3F10 (sprite palette) to the PPU
-    LDA #$3F
-    STA PPUADDR
-    LDA #$10
-    STA PPUADDR
-
-    ; Write the background colour
-    LDA #$21
-    STA PPUDATA
-
-    ; Write the palette 0 colours (player)
-    LDA #$30
-    STA PPUDATA
-    LDA #$2D
-    STA PPUDATA
-    LDA #$16
-    STA PPUDATA
-
-    ; Write the palette 1 colours (enemy)
-    LDA #$2D
-    STA PPUDATA
-    LDA #$1D
-    STA PPUDATA
-    LDA #$11
-    STA PPUDATA
-
-    ; Write the palette 2 colours (enemy when in assassination range)
-    LDA #$1D
-    STA PPUDATA
-    LDA #$3D
-    STA PPUDATA
-    LDA #$12
-    STA PPUDATA
-
-    ; Write sprite data for sprite 0 (player)
-    LDA #120    ; Y pos
-    STA sprite_player + SPRITE_Y
-    LDA #0      ; Tile No.
-    STA sprite_player + SPRITE_TILE
-    LDA #0      ; Attributes
-    STA sprite_player + SPRITE_ATTRIB
-    LDA #128    ; X pos
-    STA sprite_player + SPRITE_X
-
-    ; Write sprite data for sprite 1 (enemy)
-    LDA #130    ; Y pos
-    STA sprite_enemy + SPRITE_Y
-    LDA #$05    ; Tile No.
-    STA sprite_enemy + SPRITE_TILE
-    LDA #1      ; Attributes
-    STA sprite_enemy + SPRITE_ATTRIB
-    LDA #60     ; X pos
-    STA sprite_enemy + SPRITE_X
-
-    ; Write sprite data for sprites 3 to 0 (Score sprites)
-    LDA #10     ; Y pos
-    STA sprite_score1 + SPRITE_Y        
-    STA sprite_score2 + SPRITE_Y      
-    STA sprite_score3 + SPRITE_Y 
-    STA sprite_score4 + SPRITE_Y 
-    STA sprite_score5 + SPRITE_Y 
-    STA sprite_score_num + SPRITE_Y     
-    STA sprite_score_num2 + SPRITE_Y
-    LDA #$44    ; Tile No.
-    STA sprite_score1 + SPRITE_TILE
-    LDA #$45    ; Tile No.
-    STA sprite_score2 + SPRITE_TILE
-    LDA #$46    ; Tile No.
-    STA sprite_score3 + SPRITE_TILE
-    LDA #$47    ; Tile No.
-    STA sprite_score4 + SPRITE_TILE
-    LDA #$48    ; Tile No.
-    STA sprite_score5 + SPRITE_TILE
-    LDA #$80    ; Tile No.
-    STA sprite_score_num + SPRITE_TILE
-    STA sprite_score_num2 + SPRITE_TILE
-    LDA #0   ; Attributes
-    STA sprite_score1 + SPRITE_ATTRIB
-    STA sprite_score2 + SPRITE_ATTRIB
-    STA sprite_score3 + SPRITE_ATTRIB
-    STA sprite_score4 + SPRITE_ATTRIB
-    STA sprite_score5 + SPRITE_ATTRIB
-    STA sprite_score_num + SPRITE_ATTRIB
-    STA sprite_score_num2 + SPRITE_ATTRIB
-    LDA #8          ; X pos
-    STA sprite_score1 + SPRITE_X
-    LDA #16         ; X pos
-    STA sprite_score2 + SPRITE_X
-    LDA #24         ; X pos
-    STA sprite_score3 + SPRITE_X
-    LDA #32         ; X pos
-    STA sprite_score4 + SPRITE_X
-    LDA #40         ; X pos
-    STA sprite_score5 + SPRITE_X
-    LDA #50         ; X pos
-    STA sprite_score_num + SPRITE_X
-    LDA #56         ; X pos
-    STA sprite_score_num2 + SPRITE_X
+    ; Write sprite data and initialise sprites
+    INCLUDE "sprite_data.asm"
 
     ; Load nametable data 
     LDA #$20   ; Write address $2000 to PPUADDR register
@@ -390,7 +273,6 @@ LoadAttributes2_Loop:
     DEX
     BNE LoadAttributes2_Loop
     
-    
 
     RTS ; End subroutine
 ; ----------------------------------------------------------------------------
@@ -403,163 +285,10 @@ NMI:
     JMP UpdateHit_Stop
 NoHit_Stop:
 
-                                   ;            \1       \2       \3      \4        \5            \6             \7   
-CheckCollisionWithWall .macro ; parameters: scroll_x, player_y, wall_x, wall_w, wall_h, no_collision_label, on_top_label
-    ; if there is a collision, execution continues immediately after this macro
-    ; else, jump to no_collision_label
-    LDA \1                              
-    CLC
-    CMP \3                                         ; if scroll_x >= wall_x check next collision, else branch to no_collision_label 
-    BCC \6
-    CLC
-    CMP \3 + \4 + (PLAYER_X_OFFSET-1)              ; if scroll_x >= wall_x + wall_w + player_x_offset then no collision, else check Y collision
-    BCS \6
-    ; Check if player Y collision with wall height
-    LDA #SCREEN_BOTTOM
-    SEC
-    SBC \5 - PLAYER_HEIGHT                         ; Subtract wall height and player height from the screen bottom to find top of of wall.
-    CMP \2                                         ; If Screen_botttom - wall_h - Player_height >= player_y then player is on top of wall
-    BCS \7                                         ; Branch to the on_top_label 
-    .endm
-
-SetClimbingActive .macro ; parameters: true(1) or false(0), collision_active (left or right)
-    LDA \1
-    STA \2
-    .endm
-
-SetClimbingSprite .macro ; parameters: climbing_direction left(0) or Right(1)
-    .if \1 < 1
-    ; If climbing direction is left
-    SetSpriteTile #$07, sprite_player               ; Sets sprite to climbing left sprite
-    .else
-    ; Else climbing direction must be right
-    SetSpriteTile #$06, sprite_player               ; Sets sprite to climbing right sprite
-    .endif
-    .endm 
-
-SetBottom .macro    ; parameters: wall_h
-    LDA #(SCREEN_BOTTOM + PLAYER_HEIGHT - \1)       ; Load SCREEN BOTTOM + PLAYER HEIGHT - WALL HEIGHT into accumulator
-    STA screen_bottom                               ; Store in screen_bottom 
-    JMP NoClimbingActive
-    .endm
-
-Climb .macro
-    ; Update player Y position
-    LDA sprite_player + SPRITE_Y                    ; Load player Y into accumulator
-    SEC 
-    SBC #1                                          ; Minus 1 from player Y
-    STA sprite_player + SPRITE_Y                    ; Store value back into player Y
-    ; Stop playing from falling from gravity (or moving up from jumping)
-    ResetPlayerSpeed
-    .endm
-
-ResetPlayerSpeed .macro 
-    LDA #0                                          ; Load 0 into accumulator
-    STA player_jump_speed                           ; Store into player_jump_speed and player_jump_speed+1
-    LDA #0
-    STA player_jump_speed+1
-    .endm
-
-PlayerJump .macro 
-    ; Jump by setting player speed
-    LDA #LOW(JUMP_SPEED)
-    STA player_jump_speed
-    LDA #HIGH(JUMP_SPEED)
-    STA player_jump_speed+1
-    .endm
-
-SetSpriteTile .macro ; parameters: tile_number, sprite
-    LDA \1                                          ; Loads tile number into accumulator
-    STA \2+SPRITE_TILE                              ; Stores value into sprite
-    .endm
-
-IncrementScore .macro
-    LDA score                                       ; Loads score into accumulator
-    CLC                                             ; Clear carry flag                            
-    ADC #1                                          ; Adds 1
-    STA score                                       ; Stores back into score
-    .endm
-
-ScrollBackground .macro  ; params: Left(0) or Right(1), scroll speed,  no_scroll_wrap_label, reset (0)
-    ; If resetting scroll_x, jump over scrolling code
-    .if \4 > 0                                      
-    LDA scroll_x
-    .if \1 < 1                                      ; If direction is 0 scroll left, else scroll right 
-    SEC
-    SBC \2                                          ; Subtract scroll speed from scroll_x
-    .else
-    CLC 
-    ADC \2                                          ; Add scroll speed to scroll_x
-    .endif
-    STA scroll_x                                    ; Store value back into scroll_x
-    STA PPUSCROLL
-    ; else reset scroll_x
-    .else                                           
-    LDA #0                                          
-    STA scroll_x
-    STA PPUSCROLL
-    .endif
-
-    LDA sprite_enemy+SPRITE_X
-    ; If direction is 0 scroll left
-    .if \1 < 1                                      
-    CLC
-    ADC \2                                          ; Add scroll speed to playerX
-    ; else scroll right 
-    .else
-    LDA sprite_enemy+SPRITE_X
-    SEC
-    SBC \2                                          ; Subtract scroll speed from playerX
-    .endif
-    STA sprite_enemy+SPRITE_X
-    BCC \3                                          ; If carry flag is not clear scroll_x has wrapped, else branch to no_scroll_wrap_label  
-    ; scroll_x has wrapped, so switch scroll_page
-    LDA scroll_page
-    EOR #1
-    STA scroll_page
-    ORA #%10000000
-    STA PPUCTRL
-; No scroll wrap label
-\3:
-    LDA #0
-    STA PPUSCROLL  
-    .endm
-
-SpawnArrow .macro
-    ; Set arrow to active
-    LDA #1
-    STA arrow_active
-    ; Spawn arrow sprite at player
-    LDA sprite_player + SPRITE_Y   ; Y pos
-    STA sprite_arrow + SPRITE_Y
-    SetSpriteTile #2, sprite_arrow
-    LDA #0                         ; Attributes 
-    STA sprite_arrow + SPRITE_ATTRIB
-    LDA sprite_player + SPRITE_X   ; X pos
-    STA sprite_arrow + SPRITE_X
-    LDA arrow_direction
-    BEQ ReadB_Done
-    ; Flip the sprite if shooting left (if direction == 1)
-    LDA sprite_arrow+SPRITE_ATTRIB
-    EOR #%01000000
-    STA sprite_arrow+SPRITE_ATTRIB
-    .endm
-
-CollisionCheck .macro
-    ; CheckCollisionWithWall parameters: scroll_x, player_y, wall_x, wall_w, wall_h, no_collision_label, on_top_label
-    CheckCollisionWithWall \1, \2, \3, \4, \5, \6, \7
-    ; SetClimbingActive      parameters: true(1) or false(0), collision_active (left or right)
-    SetClimbingActive #1, \8   ; Set climbing to true
-    ; SetClimbingSprite      parameters: climbing_direction left(0) or Right(1)
-    SetClimbingSprite \9
-    LDA #0
-    STA on_top_wall           ; Set on_top_wall (player is on top of a wall) to true
-    JMP CollisionChecksDone
-\7:
-    LDA #1
-    STA on_top_wall           ; Set on_top_wall (player is on top of a wall) to true
-    SetBottom \5
-    .endm 
+    ; Include macros
+    INCLUDE "macros.asm"
+    
+;----------- WALL COLLISION CHECKS--------;
 
     ; CollisionCheck parameters: scroll_x, player_y, wall_x, wall_w, wall_h, no_collision_label, on_top_label, climbing_active_direction, left(0) or right (1)
     ; RIGHT COLLISIONS
@@ -585,6 +314,7 @@ NoClimbingActive:
     ;SetSpriteTile #0, sprite_player   
 CollisionChecksDone:
 
+;----------- CHECK ASSASSINATION RANGE--------;
 ; Check if player in assassinate range
     LDA sprite_player+SPRITE_X
     CLC
@@ -612,6 +342,8 @@ NotInRange:
     STA sprite_enemy+SPRITE_ATTRIB ; Set enemy attributes (Reset back to normal colour when not in range)
 AssassinateRangeCheck_Done:
 
+;----------- READ JOYPAD--------;
+
     ; Initialise controller 1
     LDA #1
     STA JOY1
@@ -629,7 +361,7 @@ ReadController:
     CPX #8
     BNE ReadController
 
-; React to Right button
+;----------- RIGHT BUTTON--------;
 
     LDA joypad1_state
     AND #BUTTON_RIGHT
@@ -681,7 +413,7 @@ WallJumpRight:
     PlayerJump
 ReadRight_Done:
 
-; React to Down button
+;----------- DOWN BUTTON--------;
 
     LDA joypad1_state
     AND #BUTTON_DOWN
@@ -689,7 +421,7 @@ ReadRight_Done:
 
 ReadDown_Done:
 
-; React to Left button
+;----------- LEFT BUTTON--------;
 
     LDA joypad1_state
     AND #BUTTON_LEFT
@@ -740,7 +472,7 @@ WallJumpLeft:
     
 ReadLeft_Done:
 
-; React to Up button
+;----------- UP BUTTON--------;
 
     LDA joypad1_state
     AND #BUTTON_UP
@@ -757,7 +489,7 @@ ReadLeft_Done:
 
 ReadUp_Done:
 
-; React to A button
+;----------- A BUTTON--------;
 
     LDA joypad1_state
     AND #BUTTON_A
@@ -776,7 +508,7 @@ ReadUp_Done:
 
 ReadA_Done:
 
-; React to B button
+;----------- B BUTTON--------;
 
     LDA joypad1_state
     AND #BUTTON_B
@@ -819,38 +551,15 @@ DestroyArrow
     STA arrow_direction
 
 UpdateArrow_Done:
-
-assassinateEnemy .macro  
-    LDA player_jump_speed    ; Low 8 bits
-    CLC
-    ADC #LOW(ASSASSIN_FALL_SPEED)
-    STA player_jump_speed
-    LDA player_jump_speed+1  ; High 8 bits
-    ADC #HIGH(ASSASSIN_FALL_SPEED)  ; NB: *don't* clear the carry flag!
-    STA player_jump_speed+1
-    LDA sprite_player+SPRITE_X
-    CMP sprite_enemy+SPRITE_X       ; if playerX >= enemyX set carry flag
-    BCS assassinateLeft
-    ; Scroll background twice normal speed
-    ; assassinate right
-    ScrollBackground #1, #2, Scroll_NoWrap4, #1
-    ; Set sprite tile to assassinate tile
-    SetSpriteTile #$16, sprite_player  
-    JMP UpdatePlayerPosition
-assassinateLeft:
-    ScrollBackground #0, #2, Scroll_NoWrap5, #1
-    ; Set sprite tile to assassinate tile
-    SetSpriteTile #$17, sprite_player
-    JMP UpdatePlayerPosition
-    .endm
-
     LDA assassinate
     BEQ NotAssassinating
     ; Moves player straight to enemy and kills the enemy
     assassinateEnemy 
 
 NotAssassinating:
-    ; Update player sprite
+
+;----------- UPDATE PLAYER--------;
+
     ; First, update speed
     LDA player_jump_speed      ; Low 8 bits
     CLC
@@ -881,7 +590,7 @@ UpdatePlayerPosition:
     STA player_jump_speed+1
 UpdatePlayer_NoClamp:
 
-; Update enemies
+;----------- UPDATE ENEMY--------;
 
     ; Check if enemy can see player
     LDA sprite_player+SPRITE_Y
@@ -889,7 +598,6 @@ UpdatePlayer_NoClamp:
     BCS MoveEnemyTowardsPlayer
     JMP EnemyX_Updated
 MoveEnemyTowardsPlayer:
-
     ; Set ground
     LDA #SCREEN_BOTTOM
     STA sprite_enemy+SPRITE_GROUND
@@ -946,38 +654,7 @@ EnemyX_Updated:
     STA enemyY_speed+1
 UpdateEnemy_NoClamp:
 
-CheckCollisionWithEnemy .macro ; parameters: object_x, object_y, object_hit_x, object_hit_y, object_hit_w, object_hit_h, no_collision_label
-    ; if there is a collision, execution continues immediately after this macro
-    ; else, jump to no_collision_label
-    LDA sprite_enemy+SPRITE_X  ; Calculate x_enemy - object_hit_w (x1-w2)
-    .if \3 > 0
-    SEC
-    SBC \3
-    .endif
-    SEC
-    SBC \5+1                      ; Assume w2 = 8
-    CMP \1                        ; Compare with object_x (x2)
-    BCS \7                        ; Branch if x1-w2-1-ARROW_HITBOX_X >= x2  ie x1-w2 > x2
-    CLC
-    ADC \5+ENEMY_HITBOX_WIDTH+1   ; Calculate x_enemy + w_enemy (x1+w1) assuming w1 = 8
-    CMP \1                        ; Compare with object_x (x2)
-    BCC \7                        ; Branch if x1+w1+1+ARROW_HITBOX_X <= x2
-
-    LDA sprite_enemy+SPRITE_Y ; Calculate y_enemy - h_arrow (y1-h2)
-    .if \3 > 0
-    SEC
-    SBC \4 
-    .endif
-    SEC
-    SBC \6+1                      ; Assume h2 = 8
-    CMP \2                        ; Compare with object_y (y2)
-    BCS \7                        ; Branch if y1-h2-1-ARROW_HITBOX_Y >= y2
-    CLC
-    ADC \6+ENEMY_HITBOX_WIDTH+1   ; Calculate y_enemy + h_enemy (y1+h1) assuming h1 = 8
-    CMP \2                        ; Compare with object_y (y2)
-    BCC \7                        ; Branch if y1+h1+1+ARROW_HITBOX_Y <= y2
-
-    .endm
+;----------- ENEMY COLLISIONS--------;
 
     ; Check collision with arrow
     CheckCollisionWithEnemy sprite_arrow+SPRITE_X, sprite_arrow+SPRITE_Y, #ARROW_HITBOX_X, #ARROW_HITBOX_Y, #ARROW_HITBOX_WIDTH, #ARROW_HITBOX_HEIGHT, UpdateEnemies_NoCollision
@@ -1044,6 +721,9 @@ HitStop_Complete:
 UpdateEnemies_NoCollisionWithPlayer:
     
 UpdateEnemies_End:
+
+;----------- UPDATE SCORE--------;
+
     LDA score
     CMP #10      ; If score >= 10 increment tens digit
     BCS IncrementTensDigit 
@@ -1076,38 +756,7 @@ ScoreUpdateDone:
 
 ; ---------------------------------------------------------------------------
 
-NametableData:
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$40,$41,$42,$43,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$50,$51,$52,$53,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$60,$61,$62,$63,$03,$03,$03  
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$70,$71,$72,$73,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03  
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03
-    .db $03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$20,$21,$22,$23,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03 
-    .db $03,$03,$03,$03,$03,$03,$20,$21,$22,$23,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03  
-    .db $03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$03,$03,$03,$03,$03,$03,$03,$03,$03,$03,$10,$11,$12,$13,$10,$11,$12,$13,$03,$03,$03,$03 
-    .db $0B,$03,$03,$03,$03,$03,$20,$21,$22,$23,$03,$29,$2A,$2B,$2C,$2D,$2E,$2F,$03,$03,$20,$21,$22,$23,$20,$21,$22,$23,$03,$03,$09,$0A 
-    .db $1B,$1C,$1D,$03,$03,$03,$10,$11,$12,$13,$03,$39,$3A,$3B,$3C,$3D,$3E,$3F,$03,$03,$10,$11,$12,$13,$10,$11,$12,$13,$03,$03,$19,$1A
-    .db $08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$08,$08,$08,$08,$08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$20,$21,$22,$23,$08,$08,$08,$08 
-    .db $08,$08,$08,$08,$08,$08,$10,$11,$12,$13,$08,$08,$08,$08,$08,$08,$08,$08,$08,$08,$10,$11,$12,$13,$10,$11,$12,$13,$08,$08,$08,$08 
-    .db $08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$08,$08,$08,$08,$08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$20,$21,$22,$23,$08,$08,$08,$08 
-    .db $08,$08,$08,$08,$08,$08,$10,$11,$12,$13,$08,$08,$08,$08,$08,$08,$08,$08,$08,$08,$10,$11,$12,$13,$10,$11,$12,$13,$08,$08,$08,$08 
-    .db $08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$08,$08,$08,$08,$08,$08,$08,$08,$08,$08,$20,$21,$22,$23,$20,$21,$22,$23,$08,$08,$08,$08
-    .db $00 ; null terminator
+    INCLUDE "nametable.asm"
 
 ; ---------------------------------------------------------------------------
 
