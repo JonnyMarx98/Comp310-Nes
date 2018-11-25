@@ -161,7 +161,7 @@ assassinateEnemy .macro
     CLC
     ADC #LOW(ASSASSIN_FALL_SPEED)
     STA player_jump_speed
-    LDA player_jump_speed+1  ; High 8 bits
+    LDA player_jump_speed+1         ; High 8 bits
     ADC #HIGH(ASSASSIN_FALL_SPEED)  ; NB: *don't* clear the carry flag!
     STA player_jump_speed+1
     LDA sprite_player+SPRITE_X
