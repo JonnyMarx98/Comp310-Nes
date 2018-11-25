@@ -303,10 +303,10 @@ NoCollision3:
     CollisionCheck scroll_x, sprite_player+SPRITE_Y, #WALL2_X, #WALL2_W, #WALL2_H, NoCollision4, OnTop4, climbing_left_active, #0
 NoCollision4:
     ;  Reset floor
-    LDA #224
+    LDA #SCREEN_BOTTOM
     STA screen_bottom
     LDA #0
-    STA on_top_wall           ; Set on_top_wall (player is on top of a wall) to true
+    STA on_top_wall                ; Set on_top_wall (player is on top of a wall) to true
 NoClimbingActive:
     ; Set both climbing bools to false
     SetClimbingActive #0, climbing_right_active
@@ -365,7 +365,7 @@ ReadController:
 
     LDA joypad1_state
     AND #BUTTON_RIGHT
-    BEQ ReadRightDone_JUMP             ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
+    BEQ ReadRightDone_JUMP         ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
     JMP RightPressed
 ReadRightDone_JUMP:
     JMP ReadRight_Done 
@@ -383,27 +383,27 @@ NoWallCollision:
     ScrollBackground #1, #1, Scroll_NoWrap, #1
     ; Set arrow direction
     LDA arrow_active
-    BNE SetNextArrowDirection     ; If arrow is active, set next arrow direction so it doesn't affect the current active arrow 
+    BNE SetNextArrowDirection      ; If arrow is active, set next arrow direction so it doesn't affect the current active arrow 
     LDA #0
-    STA arrow_direction           ; If arrow is not active, set the arrow direction to right
+    STA arrow_direction            ; If arrow is not active, set the arrow direction to right
     JMP UpdateSpriteTile
 SetNextArrowDirection:
     LDA #0
-    STA next_arrow_direction      ; Set next arrow direction to right
+    STA next_arrow_direction       ; Set next arrow direction to right
 UpdateSpriteTile:
     ; Update sprite tile (ANIMATION)
     LDA player_anim_state
-    BEQ ZeroState                 ; If anim state is 0 branch to ZeroState
+    BEQ ZeroState                  ; If anim state is 0 branch to ZeroState
     ; Accumulator is 1
-    STA sprite_player+SPRITE_TILE ; Else set the sprite tile to tile 01 (state 1 right)
+    STA sprite_player+SPRITE_TILE  ; Else set the sprite tile to tile 01 (state 1 right)
     LDA #0
-    STA player_anim_state         ; Switch anim state
+    STA player_anim_state          ; Switch anim state
     JMP SpriteTile_Updated
 ZeroState:
     ; Accumulator is 0
-    STA sprite_player+SPRITE_TILE ; Set the sprite tile to tile 00 (state 0 right)
+    STA sprite_player+SPRITE_TILE  ; Set the sprite tile to tile 00 (state 0 right)
     LDA #1
-    STA player_anim_state         ; Switch anim state
+    STA player_anim_state          ; Switch anim state
 SpriteTile_Updated:
     ; Check if player is on a left wall
     LDA climbing_left_active   
@@ -425,7 +425,7 @@ ReadDown_Done:
 
     LDA joypad1_state
     AND #BUTTON_LEFT
-    BEQ ReadLeftDone_JUMP              ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button 
+    BEQ ReadLeftDone_JUMP          ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button 
     JMP LeftPressed
 ReadLeftDone_JUMP:
     JMP ReadLeft_Done
@@ -465,7 +465,7 @@ ZeroState2:
 SpriteTile_Updated2: 
     ; Check if player is on right wall
     LDA climbing_right_active   
-    BNE WallJumpLeft               ; If player is climbing a right wall, branch to WallJumpLeft
+    BNE WallJumpLeft                    ; If player is climbing a right wall, branch to WallJumpLeft
     JMP ReadLeft_Done
 WallJumpLeft:
     PlayerJump
@@ -594,52 +594,52 @@ UpdatePlayer_NoClamp:
 
     ; Check if enemy can see player
     LDA sprite_player+SPRITE_Y
-    CMP #SCREEN_BOTTOM - ENEMY_Y_VISION   ; if playerX >= bottom+ enemy Y vision set carry
+    CMP #SCREEN_BOTTOM - ENEMY_Y_VISION   ; if playerX >= bottom + enemy Y vision branch to MoveEnemyTowardsPlayer
     BCS MoveEnemyTowardsPlayer
-    JMP EnemyX_Updated
+    JMP EnemyX_Updated                    ; Else EnemyX is updated 
 MoveEnemyTowardsPlayer:
     ; Set ground
     LDA #SCREEN_BOTTOM
     STA sprite_enemy+SPRITE_GROUND
     LDA sprite_player+SPRITE_X
-    CMP sprite_enemy+SPRITE_X     ; if playerX >= enemyX set carry flag, else clear carry flag
+    CMP sprite_enemy+SPRITE_X             ; if playerX >= enemyX set carry flag, else clear carry flag
     BCC MoveEnemyLeft
 MoveEnemyRight:
     ; Second, update position
-    LDA enemyX_position_sub       ; Low 8 bits
+    LDA enemyX_position_sub               ; Low 8 bits
     CLC
     ADC #LOW(ENEMY_X_SPEED)*-1
     STA enemyX_position_sub
-    LDA sprite_enemy+SPRITE_X     ; High 8 bits
-    ADC #HIGH(ENEMY_X_SPEED)*-1   ; NB: *don't* clear the carry flag!
+    LDA sprite_enemy+SPRITE_X             ; High 8 bits
+    ADC #HIGH(ENEMY_X_SPEED)*-1           ; NB: *don't* clear the carry flag!
     STA sprite_enemy+SPRITE_X
     JMP EnemyX_Updated
 MoveEnemyLeft:
     ; Second, update position
-    LDA enemyX_position_sub    ; Low 8 bits
+    LDA enemyX_position_sub               ; Low 8 bits
     SEC
     SBC #LOW(ENEMY_X_SPEED)
     STA enemyX_position_sub
-    LDA sprite_enemy+SPRITE_X ; High 8 bits
-    SBC #HIGH(ENEMY_X_SPEED)  ; NB: *don't* clear the carry flag!
+    LDA sprite_enemy+SPRITE_X             ; High 8 bits
+    SBC #HIGH(ENEMY_X_SPEED)              ; NB: *don't* clear the carry flag!
     STA sprite_enemy+SPRITE_X
 EnemyX_Updated:
     ; First, update speed
-    LDA enemyY_speed    ; Low 8 bits
+    LDA enemyY_speed                      ; Low 8 bits
     CLC
     ADC #LOW(GRAVITY)
     STA enemyY_speed
-    LDA enemyY_speed+1  ; High 8 bits
-    ADC #HIGH(GRAVITY)  ; NB: *don't* clear the carry flag!
+    LDA enemyY_speed+1                    ; High 8 bits
+    ADC #HIGH(GRAVITY)                    ; NB: *don't* clear the carry flag!
     STA enemyY_speed+1
 
     ; Second, update position
-    LDA enemyY_position_sub    ; Low 8 bits
+    LDA enemyY_position_sub               ; Low 8 bits
     CLC
     ADC enemyY_speed
     STA enemyY_position_sub
-    LDA sprite_enemy+SPRITE_Y ; High 8 bits
-    ADC enemyY_speed+1        ; NB: *don't* clear the carry flag!
+    LDA sprite_enemy+SPRITE_Y             ; High 8 bits
+    ADC enemyY_speed+1                    ; NB: *don't* clear the carry flag!
     STA sprite_enemy+SPRITE_Y
 
     ; Check for the bottom of screen
@@ -649,8 +649,8 @@ EnemyX_Updated:
     SEC
     SBC #1
     STA sprite_enemy+SPRITE_Y
-    LDA #0                  ; Set player speed to zero
-    STA enemyY_speed        ; (both bytes)
+    LDA #0                                ; Set player speed to zero
+    STA enemyY_speed                      ; (both bytes)
     STA enemyY_speed+1
 UpdateEnemy_NoClamp:
 
