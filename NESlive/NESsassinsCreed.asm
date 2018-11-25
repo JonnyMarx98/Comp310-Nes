@@ -287,7 +287,7 @@ NoHit_Stop:
 
     ; Include macros
     INCLUDE "macros.asm"
-    
+
 ;----------- WALL COLLISION CHECKS--------;
 
     ; CollisionCheck parameters: scroll_x, player_y, wall_x, wall_w, wall_h, no_collision_label, on_top_label, climbing_active_direction, left(0) or right (1)
@@ -493,7 +493,7 @@ ReadUp_Done:
 
     LDA joypad1_state
     AND #BUTTON_A
-    BEQ ReadA_Done                 ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button
+    BEQ ReadA_Done                 ; if ((JOY1 & 1)) != 0 execution continues, else branch to next button.
     LDA assassinate                
     BNE ReadA_Done                 ; if already assassinating branch to ReadA_Done
     LDA InAssassinateRange         
