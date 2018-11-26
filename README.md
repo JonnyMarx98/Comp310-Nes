@@ -1,4 +1,4 @@
-# Comp310-Nes
+# NES demake of Assassins Creed: Origins
 Version control repository: https://github.com/JonnyMarx98/Comp310-Nes
 
 Game Controls:
